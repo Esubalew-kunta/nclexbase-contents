@@ -1,4 +1,4 @@
-import { checkFfmpeg } from "@/lib/export/ffmpeg";
+import { checkChrome } from "@/lib/export/browser";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -39,17 +39,26 @@ export async function GET() {
     detail: hasSecret ? "set" : process.env.NODE_ENV === "production" ? "missing — exports will fail across instances" : "not set (dev fallback in use)",
   };
 
-  // ffmpeg is a system binary, not an npm dependency, so nothing guarantees it.
-  const ff = await checkFfmpeg();
-  checks.ffmpeg = { ok: ff.ok, detail: ff.ok ? (ff.version ?? "available") : (ff.reason ?? "unavailable") };
+  // Chrome drives every slide render. Being installed isn't enough — a Chrome
+  // that can't actually launch (missing libraries, tiny /dev/shm) is the
+  // failure that would otherwise surface as a mid-export timeout, so this
+  // launches it for real.
+  //
+  // Deliberately NOT part of `critical` below. On a small shared instance
+  // Chrome is slow to start, and a health check that 503s on a slow-but-working
+  // dependency makes the platform restart the container in a loop — turning a
+  // degraded feature into a fully offline app. Chrome is reported so the admin
+  // can see it, but it doesn't declare the service unhealthy.
+  const chrome = await checkChrome();
+  checks.chrome = { ok: chrome.ok, detail: chrome.ok ? `Chrome ${chrome.version}` : (chrome.reason ?? "unavailable") };
 
   // Telegram credentials — reported separately because the app is still usable
   // (image export, the whole question bank) without them.
   const hasTelegram = Boolean(process.env.TELEGRAM_BOT_TOKEN?.trim() && process.env.TELEGRAM_CHANNEL?.trim());
   checks.telegram = { ok: hasTelegram, detail: hasTelegram ? "configured" : "not configured — publishing disabled" };
 
-  // Only the first four gate overall health; Telegram being unset is a
-  // configuration choice, not an outage.
+  // Only things whose absence makes the app unusable at all gate health. ffmpeg
+  // and Telegram are reported but never trigger a restart.
   const critical = ["NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "supabase", "PRINT_TOKEN_SECRET"];
   const healthy = critical.every((k) => checks[k]?.ok);
 

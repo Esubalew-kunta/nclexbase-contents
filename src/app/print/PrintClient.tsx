@@ -11,14 +11,8 @@ declare global {
     __READY__?: boolean;
     __SLIDE_COUNT__?: number;
     __SLIDE_KINDS__?: { kind: "question" | "answer"; isContinuation: boolean }[];
-    __COUNTDOWN_COUNT__?: number;
   }
 }
-
-const LAST_QUESTION_SLIDE_INDEX = (kinds: { kind: string }[]) => {
-  for (let i = kinds.length - 1; i >= 0; i--) if (kinds[i].kind === "question") return i;
-  return -1;
-};
 
 export default function PrintClient() {
   const searchParams = useSearchParams();
@@ -40,16 +34,12 @@ export default function PrintClient() {
     if (plan) {
       window.__SLIDE_COUNT__ = plan.slides.length;
       window.__SLIDE_KINDS__ = plan.slides.map((s) => ({ kind: s.kind, isContinuation: s.isContinuation }));
-      window.__COUNTDOWN_COUNT__ = payload?.countdownSeconds ?? 0;
       window.__READY__ = true;
     }
   }, [plan, payload]);
 
   if (error) return <div style={{ color: "red", padding: 20 }}>{error}</div>;
   if (!payload || !plan) return <>{measurer}</>;
-
-  const lastQuestionIdx = LAST_QUESTION_SLIDE_INDEX(plan.slides);
-  const countdownSeconds = payload.countdownSeconds ?? 0;
 
   return (
     <div>
@@ -59,20 +49,6 @@ export default function PrintClient() {
           <SlideCanvas question={payload.question} templateId={payload.templateId} slide={slide} overallIndex={i + 1} overallTotal={plan.slides.length} />
         </div>
       ))}
-      {countdownSeconds > 0 &&
-        lastQuestionIdx >= 0 &&
-        Array.from({ length: countdownSeconds }).map((_, i) => (
-          <div key={`cd-${i}`} data-countdown-frame={i} style={{ width: 1080, height: 1920 }}>
-            <SlideCanvas
-              question={payload.question}
-              templateId={payload.templateId}
-              slide={plan.slides[lastQuestionIdx]}
-              overallIndex={lastQuestionIdx + 1}
-              overallTotal={plan.slides.length}
-              countdown={countdownSeconds - i}
-            />
-          </div>
-        ))}
     </div>
   );
 }

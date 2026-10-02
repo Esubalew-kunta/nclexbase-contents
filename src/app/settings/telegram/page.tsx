@@ -20,7 +20,7 @@ interface HealthReport {
   checks: Record<string, { ok: boolean; detail: string }>;
 }
 
-/** Surfaces the server-side dependencies the admin cannot otherwise see. ffmpeg
+/** Surfaces the server-side dependencies the admin cannot otherwise see. Chrome
  * is a system binary and PRINT_TOKEN_SECRET is an env var, so neither failing
  * announces itself until the exact feature that needs it is used — this puts
  * both on a screen the admin already visits. */
@@ -36,11 +36,11 @@ function ServerStatus() {
 
   if (!health) return null;
 
-  const order = ["supabase", "PRINT_TOKEN_SECRET", "ffmpeg", "telegram"] as const;
+  const order = ["supabase", "PRINT_TOKEN_SECRET", "chrome", "telegram"] as const;
   const label: Record<string, string> = {
     supabase: "Database",
     PRINT_TOKEN_SECRET: "Export signing",
-    ffmpeg: "Video (ffmpeg)",
+    chrome: "Browser (Chrome)",
     telegram: "Telegram bot",
   };
 

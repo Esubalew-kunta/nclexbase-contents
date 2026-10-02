@@ -7,7 +7,6 @@ import { ScaledSlide } from "@/components/slides/ScaledSlide";
 import { SlideCanvas } from "@/components/slides/SlideCanvas";
 import { SlideZoomModal } from "./SlideZoomModal";
 import { TelegramScheduleModal } from "@/components/telegram/TelegramScheduleModal";
-import { VideoExportModal } from "./VideoExportModal";
 import type { TemplateId } from "@/lib/slides/types";
 
 function DownloadSlideButton({ question, templateId, slideIndex, ctaText }: { question: NormalizedQuestion; templateId: TemplateId; slideIndex: number; ctaText: string }) {
@@ -62,7 +61,6 @@ export function PreviewPane({ question, templateId, ctaText }: { question: Norma
   const { plan, measurer } = useSlidePlan(question, templateId, ctaText);
   const [zoomed, setZoomed] = useState<number | null>(null);
   const [showTelegram, setShowTelegram] = useState(false);
-  const [showVideo, setShowVideo] = useState(false);
 
   if (!question) {
     return (
@@ -86,9 +84,6 @@ export function PreviewPane({ question, templateId, ctaText }: { question: Norma
               className="rounded-lg border border-[#3390ec]/30 bg-[#3390ec]/10 px-4 py-2 text-sm font-semibold text-[#3390ec] hover:bg-[#3390ec]/15"
             >
               Schedule to Telegram
-            </button>
-            <button type="button" onClick={() => setShowVideo(true)} className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-brand-dark hover:bg-gray-50">
-              Create Video
             </button>
           </div>
 
@@ -119,7 +114,6 @@ export function PreviewPane({ question, templateId, ctaText }: { question: Norma
           )}
 
           {showTelegram && <TelegramScheduleModal question={question} onClose={() => setShowTelegram(false)} />}
-          {showVideo && <VideoExportModal question={question} templateId={templateId} ctaText={ctaText} onClose={() => setShowVideo(false)} />}
         </>
       )}
     </div>

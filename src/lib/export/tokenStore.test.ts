@@ -52,14 +52,6 @@ describe("putPrintPayload", () => {
     });
   });
 
-  it("carries the video-only countdown field", () => {
-    withSecret(() => {
-      const token = putPrintPayload({ question: question(), templateId: "clean-clinical", ctaText: "", countdownSeconds: 3 });
-      const result = getPrintPayload(token);
-      expect(result.ok && result.payload.countdownSeconds).toBe(3);
-    });
-  });
-
   it("needs no server-side state — a token minted before the call is still valid", () => {
     withSecret(() => {
       const token = putPrintPayload({ question: question(), templateId: "modern-study", ctaText: "" });

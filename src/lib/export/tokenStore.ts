@@ -7,10 +7,6 @@ export interface PrintPayload {
   question: NormalizedQuestion;
   templateId: TemplateId;
   ctaText: string;
-  /** Video export only: renders this many extra countdown-overlay frames of
-   * the last question slide, counting down to 1. Omitted/0 for plain PNG
-   * export, where no countdown frames exist. */
-  countdownSeconds?: number;
 }
 
 // Hands a question to the Playwright-driven /print page.
