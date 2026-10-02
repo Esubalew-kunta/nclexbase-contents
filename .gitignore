@@ -45,3 +45,8 @@ devserver.log
 
 # Agent/editor tooling state, not part of the app
 .claude/
+
+# Local Docker build log
+Dockerfile.build.log
+dockerbuild.log
+
