@@ -1,0 +1,285 @@
+.canvas {
+  width: 1080px;
+  height: 1920px;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  font-family: var(--font-inter), system-ui, sans-serif;
+}
+
+.band {
+  background: #0e5a5c;
+  padding: 76px 72px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  position: relative;
+  flex: 0 0 auto;
+}
+.band::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 5px;
+  background: #c9a34e;
+}
+.brandRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.logo {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  display: block;
+  filter: brightness(0) invert(1);
+  opacity: 0.9;
+}
+.brand {
+  font-size: 25px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.75);
+  text-transform: uppercase;
+}
+.cat {
+  font-size: 23px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: #c9a34e;
+  display: block;
+}
+.qlabel {
+  font-size: 36px;
+  font-weight: 800;
+  color: #ffffff;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+.contLabel {
+  font-size: 26px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  padding: 64px 72px 48px;
+  display: flex;
+  flex-direction: column;
+}
+.instructions {
+  font-size: 26px;
+  font-weight: 700;
+  color: #0e5a5c;
+  margin: -14px 0 24px;
+}
+
+.footer {
+  margin-top: auto;
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  padding-top: 24px;
+}
+.bar {
+  width: 64px;
+  height: 6px;
+  border-radius: 4px;
+  background: #e4e8e4;
+}
+.barActive {
+  background: #c9a34e;
+}
+
+/* ---- blocks ---- */
+.qtext {
+  font-size: 58px;
+  font-weight: 800;
+  line-height: 1.28;
+  color: #173133;
+  margin: 0;
+  padding-bottom: 26px;
+}
+.optCard {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  background: rgba(14, 90, 92, 0.06);
+  border-radius: 20px;
+  padding: 28px 30px;
+}
+.badge {
+  flex: 0 0 58px;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: #0e5a5c;
+  color: #fff;
+  font-weight: 800;
+  font-size: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.badgeOutline {
+  background: transparent;
+  border: 2px solid #b9c4c1;
+  color: #5b7072;
+  flex: 0 0 46px;
+  width: 46px;
+  height: 46px;
+  font-size: 21px;
+}
+.badgeFillSm {
+  flex: 0 0 46px;
+  width: 46px;
+  height: 46px;
+  font-size: 21px;
+  background: #0e5a5c;
+  color: #fff;
+}
+.optText {
+  font-size: 36px;
+  line-height: 1.4;
+  color: #173133;
+  font-weight: 600;
+  padding-top: 6px;
+}
+
+.sectionTop {
+  padding-top: 32px;
+}
+.itemTop {
+  padding-top: 20px;
+}
+
+.bowtie {
+  padding-top: 30px;
+}
+
+.correctCard {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  background: rgba(14, 90, 92, 0.07);
+  border: 2px solid #0e5a5c;
+  border-radius: 20px;
+  padding: 30px 32px;
+}
+.correctLabel {
+  display: block;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #0e5a5c;
+  margin-bottom: 10px;
+}
+.check {
+  color: #c9a34e;
+}
+.correctText {
+  font-size: 38px;
+  font-weight: 700;
+  color: #173133;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.card {
+  background: #fbfbfa;
+  border: 1px solid #e7eae6;
+  border-radius: 20px;
+  padding: 30px 32px;
+}
+.h {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #0e5a5c;
+  margin: 0 0 16px;
+  text-transform: uppercase;
+}
+.p {
+  font-size: 32px;
+  line-height: 1.5;
+  color: #173133;
+  margin: 0;
+  font-weight: 500;
+}
+.pSm {
+  font-size: 28px;
+  line-height: 1.45;
+  padding-top: 4px;
+}
+.row {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.keypoint {
+  background: rgba(201, 163, 78, 0.1);
+  border: 1.5px solid #c9a34e;
+  border-radius: 20px;
+  padding: 28px 32px;
+}
+.kplabel {
+  display: block;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #c9a34e;
+  margin-bottom: 10px;
+}
+.kptext {
+  font-size: 32px;
+  line-height: 1.45;
+  color: #173133;
+  margin: 0;
+  font-weight: 600;
+}
+
+.ctaBanner {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: #c9a34e;
+  border-radius: 20px;
+  padding: 26px 28px;
+}
+.ctaIcon {
+  flex: 0 0 52px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #173133;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ctaTitle {
+  font-size: 30px;
+  font-weight: 800;
+  color: #173133;
+  margin: 0 0 5px;
+  letter-spacing: -0.01em;
+}
+.ctaSub {
+  font-size: 22px;
+  font-weight: 700;
+  color: #173133;
+  margin: 0;
+  line-height: 1.3;
+}
+
+/* Block column wrapper. Takes the shrink-to-fit zoom + width compensation
+   from SlideContent so the body padding and footer dots stay full size. */
+.content {
+  min-width: 0;
+}

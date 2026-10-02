@@ -1,0 +1,116 @@
+/* Bowtie diagram — the NGN "bow-tie" answer shape.
+   Two options on the left (Actions to Take), one in the middle (Condition Most
+   Likely), two on the right (Parameters to Monitor), with elbow connectors
+   drawn between them.
+
+   Geometry lives here; colour and type come in as CSS custom properties set by
+   the calling template, so all three templates share one layout instead of
+   maintaining three near-identical copies. */
+
+.root {
+  position: relative;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  column-gap: var(--bt-gutter, 64px);
+  align-items: center;
+}
+
+.links {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 0;
+}
+.link {
+  fill: none;
+  stroke: var(--bt-line, #b9c4c1);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.linkDim {
+  stroke: var(--bt-line-dim, #d6dedb);
+  stroke-dasharray: 8 7;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--bt-node-gap, 28px);
+  position: relative;
+  z-index: 1;
+}
+
+.heading {
+  font-family: var(--bt-font, inherit);
+  font-size: var(--bt-heading-size, 21px);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--bt-heading, #0e5a5c);
+  margin: 0 0 6px;
+  line-height: 1.2;
+}
+
+.node {
+  background: var(--bt-chip-bg, rgba(14, 90, 92, 0.06));
+  border: 2px solid var(--bt-chip-border, transparent);
+  border-radius: 16px;
+  padding: var(--bt-node-pad-y, 18px) var(--bt-node-pad-x, 20px);
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  min-height: var(--bt-node-min, 76px);
+}
+
+.nodeCenter {
+  background: var(--bt-center-bg, #0e5a5c);
+  border-color: var(--bt-center-border, #0e5a5c);
+}
+.nodeCenter .label,
+.nodeCenter .text {
+  color: var(--bt-center-text, #ffffff);
+}
+
+.nodeCorrect {
+  background: var(--bt-correct-bg, rgba(201, 163, 78, 0.14));
+  border-color: var(--bt-correct-border, #c9a34e);
+}
+.nodeDim {
+  opacity: 0.42;
+}
+
+.label {
+  flex: 0 0 auto;
+  width: var(--bt-label-size, 38px);
+  height: var(--bt-label-size, 38px);
+  border-radius: 50%;
+  background: var(--bt-chip-label-bg, #0e5a5c);
+  color: var(--bt-chip-label, #ffffff);
+  font-family: var(--bt-font, inherit);
+  font-size: var(--bt-label-font, 18px);
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.nodeCorrect .label {
+  background: var(--bt-correct-label-bg, #c9a34e);
+  color: var(--bt-correct-label, #173133);
+}
+
+.text {
+  font-family: var(--bt-font, inherit);
+  font-size: var(--bt-text-size, 23px);
+  line-height: 1.3;
+  font-weight: 600;
+  color: var(--bt-text, #173133);
+  padding-top: 3px;
+  margin: 0;
+  word-break: break-word;
+}
