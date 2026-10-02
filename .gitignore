@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local dev server log (Phase 5 tooling) - not source
+devserver.log
+
+# Agent/editor tooling state, not part of the app
+.claude/
