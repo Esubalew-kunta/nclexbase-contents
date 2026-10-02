@@ -1,0 +1,39 @@
+# Keep the build context small: the image only needs source, config and
+# package manifests. Everything here is either rebuilt inside the image or
+# would bloat the upload.
+
+node_modules
+.next
+.git
+.gitignore
+
+# Secrets — never send these to the builder.
+.env
+.env.local
+.env*.local
+
+# Local artifacts
+devserver.log
+*.zip
+*.png
+!public/brand/*.png
+out.tmp
+.claude
+
+# Editor / OS noise
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+*.swp
+
+# Tests aren't run in the image; the image only serves the app.
+**/*.test.ts
+**/*.test.tsx
+vitest.config.ts
+
+# Docker's own files
+Dockerfile
+.dockerignore
+render.yaml
+README.md

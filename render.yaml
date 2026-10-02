@@ -1,0 +1,48 @@
+# Render Blueprint. Applying this creates the service with the right build
+# settings and health check, so the only manual step afterwards is pasting in
+# the environment variables.
+#
+# This file contains no secrets. Every value below is either a build setting or
+# a `sync: false` placeholder that you fill in on Render's Environment tab.
+
+services:
+  - type: web
+    name: nclexbase-content
+    runtime: docker
+    plan: free
+    region: singapore # closest to Africa/Addis_Ababa, the configured timezone
+    branch: main
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+
+    # Free instances spin down after 15 minutes idle, so Render injects its own
+    # loading page while the service wakes. Turning that off means a cold start
+    # just takes a moment rather than showing a Render-branded page.
+    autoDeploy: true
+
+    healthCheckPath: /api/health
+
+    envVars:
+      # ---- required: Supabase ----
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+
+      # ---- required: Telegram ----
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHANNEL
+        sync: false
+
+      # ---- required: print-token signing ----
+      # Every instance must share the same value or slide exports 404 when the
+      # render lands on a different process. Any long random string works; the
+      # local .env.local already has one.
+      - key: PRINT_TOKEN_SECRET
+        sync: false
+
+      # ---- optional: only needed if Chrome isn't on the default PATH ----
+      - key: CHROME_PATH
+        sync: false
+        # value: /usr/bin/google-chrome
