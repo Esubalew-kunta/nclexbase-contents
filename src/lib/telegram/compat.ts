@@ -27,21 +27,16 @@ export function checkTelegramCompatibility(q: NormalizedQuestion): TelegramCompa
   if (q.format !== "single" && q.format !== "multiple") {
     return { compatible: false, reason: `"${q.format}" questions don't map to a Telegram quiz poll (no single set of lettered correct options).` };
   }
-  // Telegram's quiz poll type grades against exactly one correct option — there
-  // is no "select all that apply" quiz on the platform, whatever `is_multiple`
-  // in the Bot API docs might suggest (that flag only changes how a REGULAR,
-  // non-quiz poll lets someone vote; it does not add multi-answer grading to a
-  // quiz). Sending more than one correct_option_id to a quiz poll is rejected
-  // outright by Telegram with QUIZ_CORRECT_ANSWERS_TOO_MUCH — discovered by
-  // actually publishing a multi-answer SATA question end to end, not by reading
-  // the docs. A SATA question with two or more correct answers is therefore
-  // unrepresentable here, same as bowtie; it stays in the bank for image export.
-  if (q.format === "multiple" && q.correctAnswers.length > 1) {
-    return {
-      compatible: false,
-      reason: "Telegram's quiz poll only supports one correct answer. A \"select all that apply\" question with more than one correct option can't be posted as a quiz — image export is still available.",
-    };
-  }
+  // A multi-answer quiz poll ("select all that apply" with grading) genuinely
+  // did not exist on Telegram until Bot API 10.0 (May 2026): `correct_option_id`
+  // (singular) became `correct_option_ids` (plural), and `allows_multiple_answers`
+  // — previously regular-poll-only — now applies to quiz polls too. An earlier
+  // version of this check rejected every multi-answer SATA question outright,
+  // because the code sending it used a field name (`is_multiple`) that was
+  // never real, which made Telegram refuse it with QUIZ_CORRECT_ANSWERS_TOO_MUCH
+  // regardless of how many correct answers there were. Confirmed live, with the
+  // corrected field names, that two or more correct options now work. See
+  // sendQuizPoll for the publishing side of that fix.
   if (q.options.length === 0) {
     return { compatible: false, reason: "This question has no options to poll." };
   }

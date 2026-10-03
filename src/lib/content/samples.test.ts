@@ -75,11 +75,11 @@ describe("sample question files", () => {
 
   it("keeps the short samples within Telegram's poll limits so they can be tested end to end", () => {
     // A long question is deliberately over the limit; that is the point of it.
-    // A SATA sample with more than one correct answer can never be a Telegram
-    // quiz poll either — that's a platform limit (confirmed by actually
-    // publishing one), not a length one — so it's excluded the same way
-    // bowtie is. Everything else must be postable or the sample cannot
-    // exercise the quiz.
+    // Bowtie is the one format that's never postable at all, regardless of
+    // length — graded in three independent groups, no single-poll equivalent.
+    // Everything else (including multi-answer SATA, since Bot API 10.0's
+    // allows_multiple_answers + correct_option_ids now grade it correctly)
+    // must be postable or the sample cannot exercise the quiz.
     for (const file of sampleFiles.filter((f) => f.includes(".short"))) {
       const { questions } = loadSample(file);
       const q = questions[0];
@@ -87,9 +87,6 @@ describe("sample question files", () => {
       if (q.format === "bowtie") {
         expect(compat.compatible).toBe(false);
         expect(compat.reason).toMatch(/three separate groups/i);
-      } else if (q.format === "multiple" && q.correctAnswers.length > 1) {
-        expect(compat.compatible).toBe(false);
-        expect(compat.reason).toMatch(/one correct answer/i);
       } else {
         expect(compat.compatible).toBe(true);
         expect(() => buildTelegramSnapshot(q)).not.toThrow();

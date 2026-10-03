@@ -75,14 +75,20 @@ export interface SendQuizPollParams {
   options: string[];
   correctOptionIds: number[];
   isAnonymous?: boolean;
-  /** True to let the viewer select several options. Required whenever more
-   * than one option is correct, otherwise Telegram grades the poll as
-   * single-answer and every correct choice but one is marked wrong. */
-  isMultiple?: boolean;
   /** Shown natively by Telegram when the viewer taps the 💡 lamp icon after
    * answering — capped at 200 chars by the Bot API, so it's truncated here
-   * rather than rejected. */
+   * rather than rejected. Ignored when `explanationMedia` is set and no plain
+   * text is also wanted alongside the image. */
   explanation?: string;
+  /** An image for the 💡 lamp popup (Bot API 10.0's `explanation_media`).
+   * Confirmed live: Telegram Desktop renders it, but Telegram's mobile apps
+   * currently show the plain-text `explanation` only and silently drop the
+   * image — this field is from a very recent API release the mobile clients
+   * haven't fully caught up to yet. Worth sending anyway since it's free and
+   * Desktop viewers benefit, but it is NOT a reliable way to deliver the
+   * answer image to most of a channel's audience — see sendPhoto's
+   * `replyToMessageId` for the delivery path that works on every client. */
+  explanationMedia?: Buffer;
 }
 
 export interface TelegramPollMessage {
@@ -91,20 +97,43 @@ export interface TelegramPollMessage {
 }
 
 export async function sendQuizPoll(params: SendQuizPollParams): Promise<TelegramPollMessage> {
-  const res = await callTelegram<TelegramPollMessage>("sendPoll", {
-    chat_id: params.chatId,
-    question: params.question,
-    options: params.options.map((text) => ({ text })),
-    type: "quiz",
-    correct_option_ids: params.correctOptionIds,
-    is_anonymous: params.isAnonymous ?? true,
-    // Derived from the data, not the caller's intent: a poll with two or more
-    // correct options can only be answered correctly if multi-select is on.
-    is_multiple: params.correctOptionIds.length > 1 ? true : (params.isMultiple ?? undefined),
-    explanation: params.explanation ? params.explanation.slice(0, 200) : undefined,
-  });
-  if (!res.ok || !res.result) throw new Error(res.description ?? "sendPoll failed");
-  return res.result;
+  // Derived from the data, not a caller flag: a poll with two or more correct
+  // options is only graded correctly if multi-select is on (Bot API 10.0 lets
+  // this apply to quiz polls, not just regular ones).
+  const allowsMultipleAnswers = params.correctOptionIds.length > 1;
+
+  if (!params.explanationMedia) {
+    const res = await callTelegram<TelegramPollMessage>("sendPoll", {
+      chat_id: params.chatId,
+      question: params.question,
+      options: params.options.map((text) => ({ text })),
+      type: "quiz",
+      correct_option_ids: params.correctOptionIds,
+      is_anonymous: params.isAnonymous ?? true,
+      allows_multiple_answers: allowsMultipleAnswers,
+      explanation: params.explanation ? params.explanation.slice(0, 200) : undefined,
+    });
+    if (!res.ok || !res.result) throw new Error(res.description ?? "sendPoll failed");
+    return res.result;
+  }
+
+  const token = getToken();
+  const form = new FormData();
+  form.set("chat_id", params.chatId);
+  form.set("question", params.question);
+  form.set("options", JSON.stringify(params.options.map((text) => ({ text }))));
+  form.set("type", "quiz");
+  form.set("correct_option_ids", JSON.stringify(params.correctOptionIds));
+  form.set("is_anonymous", String(params.isAnonymous ?? true));
+  form.set("allows_multiple_answers", String(allowsMultipleAnswers));
+  if (params.explanation) form.set("explanation", params.explanation.slice(0, 200));
+  form.set("explanation_media", JSON.stringify({ type: "photo", media: "attach://explanation_photo" }));
+  form.set("explanation_photo", new Blob([new Uint8Array(params.explanationMedia)], { type: "image/png" }), "explanation.png");
+
+  const res = await fetch(`${API_BASE}/bot${token}/sendPoll`, { method: "POST", body: form });
+  const body = (await res.json()) as TelegramApiResult<TelegramPollMessage>;
+  if (!body.ok || !body.result) throw new Error(body.description ?? "sendPoll failed");
+  return body.result;
 }
 
 export async function sendMessage(chatId: string, text: string, parseMode?: "HTML"): Promise<{ message_id: number }> {
@@ -115,4 +144,27 @@ export async function sendMessage(chatId: string, text: string, parseMode?: "HTM
   });
   if (!res.ok || !res.result) throw new Error(res.description ?? "sendMessage failed");
   return res.result;
+}
+
+/** Uploads an image directly (multipart), unlike every other call in this file
+ * — sendPhoto takes a file, not JSON, so it can't go through callTelegram.
+ *
+ * `replyToMessageId` threads this photo visually under another message (a
+ * quiz poll, typically) — Telegram shows a small quoted preview of that
+ * message above the photo, so the two read as one unit in the channel even
+ * though they're separate messages. This is the proven, every-client way to
+ * attach an answer image to its poll; explanation_media (sendQuizPoll) is
+ * not, since Telegram's mobile apps don't render it yet. */
+export async function sendPhoto(chatId: string, photo: Buffer, caption?: string, replyToMessageId?: number): Promise<{ message_id: number }> {
+  const token = getToken();
+  const form = new FormData();
+  form.set("chat_id", chatId);
+  if (caption) form.set("caption", caption);
+  if (replyToMessageId) form.set("reply_parameters", JSON.stringify({ message_id: replyToMessageId }));
+  form.set("photo", new Blob([new Uint8Array(photo)], { type: "image/png" }), "slide.png");
+
+  const res = await fetch(`${API_BASE}/bot${token}/sendPhoto`, { method: "POST", body: form });
+  const body = (await res.json()) as TelegramApiResult<{ message_id: number }>;
+  if (!body.ok || !body.result) throw new Error(body.description ?? "sendPhoto failed");
+  return body.result;
 }

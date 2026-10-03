@@ -103,14 +103,12 @@ describe("checkTelegramCompatibility", () => {
     expect(compat.correctOptionIds).toEqual([0]);
   });
 
-  it("rejects a select-all question with more than one correct answer", () => {
-    // Telegram's quiz poll grades against exactly one correct_option_id —
-    // confirmed by actually publishing one, which Telegram rejected outright
-    // with QUIZ_CORRECT_ANSWERS_TOO_MUCH. Same treatment as bowtie: stays in
-    // the bank for image export rather than silently failing at publish time.
+  it("accepts a select-all question with several correct answers", () => {
+    // Bot API 10.0 added multi-correct quiz polls (correct_option_ids, plural,
+    // plus allows_multiple_answers). Confirmed live.
     const compat = checkTelegramCompatibility(makeQuestion({ correctAnswers: ["A", "B", "C"] }));
-    expect(compat.compatible).toBe(false);
-    expect(compat.reason).toMatch(/one correct answer/i);
+    expect(compat.compatible).toBe(true);
+    expect(compat.correctOptionIds).toEqual([0, 1, 2]);
   });
 
   it("excludes bowtie with a reason that names the image fallback", () => {
@@ -143,8 +141,10 @@ describe("checkTelegramCompatibility", () => {
 });
 
 describe("buildTelegramSnapshot", () => {
-  it("throws for a multi-answer question rather than building a snapshot Telegram will reject", () => {
-    expect(() => buildTelegramSnapshot(makeQuestion({ correctAnswers: ["A", "B", "C"] }))).toThrow(/one correct answer/i);
+  it("marks a genuinely multi-answer question as multiple", () => {
+    const snapshot = buildTelegramSnapshot(makeQuestion({ correctAnswers: ["A", "B", "C"] }));
+    expect(snapshot.isMultiple).toBe(true);
+    expect(snapshot.correctOptionIds).toEqual([0, 1, 2]);
   });
 
   it("does not mark a select-all question as multiple when only one answer is correct", () => {
