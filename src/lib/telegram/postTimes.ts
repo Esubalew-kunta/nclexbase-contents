@@ -1,35 +1,51 @@
 import { z } from "zod";
 
-/** The daily posting slots, e.g. ["09:00", "21:00"] means two posts a day. A
- * day can hold one post per slot, so the length of this array *is* the number
- * of posts per day — there is deliberately no separate counter to fall out of
- * sync with the times. */
+/** The single time of day every post goes out. Both (or all) of a day's posts
+ *  share it, which is why the count is its own setting rather than implied by
+ *  the length of a list of times. */
 export const postTimeSchema = z
   .string()
   .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Times must be 24-hour HH:MM, e.g. 09:00");
 
-export const postTimesSchema = z
-  .array(postTimeSchema)
-  .min(1, "At least one posting time is required")
-  .max(6, "At most six posts a day")
-  .refine((times) => new Set(times).size === times.length, { message: "Posting times must be unique" });
+export const postsPerDaySchema = z
+  .number()
+  .int("Posts per day must be a whole number")
+  .min(1, "At least one post a day")
+  .max(6, "At most six posts a day");
 
-export const DEFAULT_POST_TIMES = ["09:00", "21:00"];
+/** Shifts a post's UTC timestamp by whole seconds so two posts sharing one
+ *  wall-clock time are still distinct, ordered rows.
+ *
+ *  The admin asked for every post of the day to go out at the same time, and
+ *  they do — the calendar and the dashboard both display HH:MM, so a 30-second
+ *  offset is invisible. It exists only so the two rows have different
+ *  `scheduled_at` values: the publisher claims due posts ordered by that
+ *  column, and without a tiebreak "which one is slot 1" is arbitrary. */
+export const SLOT_STAGGER_SECONDS = 30;
 
-/** Sorts a validated list into the order they occur in a day, so the admin's
- * input order never affects which slot is "first". */
+export const DEFAULT_POST_TIME = "19:00";
+export const DEFAULT_POSTS_PER_DAY = 2;
+
 export function sortPostTimes(times: string[]): string[] {
   return [...times].sort();
 }
 
-/** The slot time used for a given index within a day, clamped so an index past
- * the end of the list reuses the last slot rather than producing "undefined". */
-export function slotTimeAt(postTimes: string[], index: number): string | null {
-  const sorted = sortPostTimes(postTimes);
-  if (sorted.length === 0) return null;
-  return sorted[Math.min(index, sorted.length - 1)];
+/** How many posts a single day may hold, clamped into the legal range so a
+ *  hand-edited or legacy settings row can never disable scheduling entirely.
+ *  Junk falls back to the default rather than coercing: `Number(null)` and
+ *  `Number("")` are both 0, which would silently mean "one post a day" instead
+ *  of "we don't know". */
+export function clampPostsPerDay(value: unknown): number {
+  if (typeof value !== "number" && typeof value !== "string") return DEFAULT_POSTS_PER_DAY;
+  if (typeof value === "string" && value.trim() === "") return DEFAULT_POSTS_PER_DAY;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return DEFAULT_POSTS_PER_DAY;
+  return Math.min(6, Math.max(1, Math.round(n)));
 }
 
-export function postsPerDay(postTimes: string[]): number {
-  return postTimes.length;
+/** The UTC instant for `slotIndex`-th post of a day, at wall-clock `time`.
+ *  Always returns a fixed time-of-day; `dateStr` is interpreted in the
+ *  settings' own timezone by the caller before this is applied. */
+export function slotStaggerMs(slotIndex: number): number {
+  return Math.max(0, slotIndex) * SLOT_STAGGER_SECONDS * 1000;
 }

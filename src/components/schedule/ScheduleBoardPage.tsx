@@ -32,9 +32,9 @@ interface PoolQuestion {
 }
 
 interface BoardData {
-  postTimes: string[];
+  dailyTime: string;
+  postsPerDay: number;
   timezone: string;
-  autoSchedule: boolean;
   enabled: boolean;
   assignments: Assignment[];
   unassigned: PoolQuestion[];
@@ -68,33 +68,6 @@ export function ScheduleBoardPage() {
   useEffect(() => {
     load();
   }, [load]);
-
-  async function autoFill() {
-    setBusy("auto");
-    setNotice(null);
-    try {
-      const res = await fetch("/api/schedule/auto", { method: "POST" });
-      const d = await res.json();
-      if (!res.ok) throw new Error(d.error ?? "Auto-fill failed");
-      const placed = d.scheduled.length;
-      const skipped = d.skipped.length;
-      setNotice({
-        kind: "ok",
-        text:
-          placed > 0
-            ? `Placed ${placed} question${placed > 1 ? "s" : ""} onto the calendar.` +
-              (skipped > 0 ? ` ${skipped} could not be posted (see the list below).` : "")
-            : skipped > 0
-              ? `Nothing to place — all ${skipped} remaining question${skipped > 1 ? "s" : ""} cannot be posted to Telegram.`
-              : "Nothing to place — every eligible question already has a slot.",
-      });
-      await load();
-    } catch (e) {
-      setNotice({ kind: "err", text: e instanceof Error ? e.message : "Auto-fill failed" });
-    } finally {
-      setBusy(null);
-    }
-  }
 
   async function act(postId: string, body: Record<string, unknown>, label: string) {
     setBusy(postId);
@@ -172,21 +145,14 @@ export function ScheduleBoardPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="text-sm">
             <p className="font-semibold text-brand-dark">
-              {data.postTimes.length} post{data.postTimes.length > 1 ? "s" : ""} a day at {data.postTimes.join(" and ")}
+              {data.postsPerDay} post{data.postsPerDay > 1 ? "s" : ""} a day at {data.dailyTime}
             </p>
-            <p className="text-xs text-gray-500">
-              Times shown in {data.timezone}. Auto-assign is {data.autoSchedule ? "on" : "off"}.
-            </p>
+            <p className="text-xs text-gray-500">Every post of a day goes out at that one time, in {data.timezone}.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={autoFill}
-              disabled={busy === "auto"}
-              className="rounded-lg bg-brand-teal px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-40"
-            >
-              {busy === "auto" ? "Filling…" : "Auto-fill calendar"}
-            </button>
+            <Link href="/calendar" className="rounded-lg bg-brand-teal px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">
+              Assign questions
+            </Link>
             <Link href="/settings/telegram" className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-brand-dark hover:bg-gray-50">
               Change times
             </Link>
@@ -201,7 +167,7 @@ export function ScheduleBoardPage() {
       <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-gray-500">Scheduled ({data.assignments.length})</h2>
       {data.assignments.length === 0 ? (
         <p className="mb-6 rounded-xl border border-dashed border-gray-300 p-6 text-center text-sm text-gray-400">
-          Nothing scheduled. Add questions to the bank, then press “Auto-fill calendar”.
+          Nothing scheduled. Add questions to the bank, then assign them to days from the Calendar.
         </p>
       ) : (
         <ul className="mb-8 flex flex-col gap-3">

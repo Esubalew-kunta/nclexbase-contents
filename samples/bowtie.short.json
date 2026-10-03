@@ -1,0 +1,31 @@
+{
+  "id": "bowtie-short-02",
+  "type": "bowtie",
+  "question": "A client receives intravenous penicillin in the clinic and within minutes develops hives, facial swelling, audible wheezing, and a blood pressure of 82/50 mmHg.",
+  "actionsToTake": {
+    "options": [
+      { "label": "A", "text": "Administer intramuscular epinephrine into the anterolateral thigh" },
+      { "label": "B", "text": "Discontinue the penicillin infusion immediately" },
+      { "label": "C", "text": "Apply a topical antihistamine cream to the hives" }
+    ],
+    "correctAnswer": ["A", "B"]
+  },
+  "conditionMostLikely": {
+    "options": [
+      { "label": "1", "text": "Anaphylaxis" },
+      { "label": "2", "text": "Vasovagal syncope" },
+      { "label": "3", "text": "Acute asthma exacerbation" }
+    ],
+    "correctAnswer": "1"
+  },
+  "parametersToMonitor": {
+    "options": [
+      { "label": "X", "text": "Airway patency and stridor" },
+      { "label": "Y", "text": "Blood pressure and heart rate" },
+      { "label": "Z", "text": "Serum potassium level" }
+    ],
+    "correctAnswer": ["X", "Y"]
+  },
+  "explanation": "Hives, facial swelling, wheezing, and hypotension after an IV antibiotic are the hallmark of anaphylaxis. The nurse's priorities are intramuscular epinephrine and stopping the triggering drug, then close airway and hemodynamic monitoring, since anaphylaxis can progress to airway obstruction and shock within minutes.",
+  "keyPoint": "In anaphylaxis, epinephrine is first-line and should never be delayed for antihistamines or further assessment."
+}

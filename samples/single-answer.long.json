@@ -1,0 +1,21 @@
+{
+  "id": "priority-long-01",
+  "type": "priority",
+  "question": "A 68-year-old client with a history of type 2 diabetes mellitus, hypertension, and a 40-pack-year smoking history is admitted after a 14-hour international flight. On the medical-surgical unit the client reports sudden-onset sharp, pleuritic right-sided chest pain that worsens with inspiration, along with new shortness of breath and mild anxiety. Vital signs are heart rate 118/min, respiratory rate 26/min, blood pressure 128/82 mmHg, oxygen saturation 90% on room air, and temperature 37.1 degrees C (98.8 degrees F). The client's right calf is noted to be warmer, larger, and more tender to palpation than the left. Which action should the nurse take first?",
+  "options": [
+    { "label": "A", "text": "Apply supplemental oxygen and notify the provider immediately" },
+    { "label": "B", "text": "Obtain a 12-lead ECG before doing anything else" },
+    { "label": "C", "text": "Document the complaint and plan to reassess the client again in 30 minutes" },
+    { "label": "D", "text": "Assist the client to the bathroom to help relieve the discomfort" },
+    { "label": "E", "text": "Apply a warm compress to the right calf and elevate the leg on two pillows" }
+  ],
+  "correctAnswer": "A",
+  "optionRationales": {
+    "B": "An ECG can wait; it does not correct the client's hypoxia, and the provider still needs to be notified right away for a suspected pulmonary embolism.",
+    "C": "Waiting 30 minutes to reassess risks the client's airway, oxygenation, and circulation while a probable PE goes unaddressed.",
+    "D": "Ambulating a client with a suspected DVT or PE risks dislodging the clot and causing a larger embolism; the client should stay on bed rest.",
+    "E": "Massaging or manipulating a leg with a suspected DVT can dislodge the clot; the leg should be left undisturbed, not elevated and warmed."
+  },
+  "explanation": "This client's new pleuritic chest pain, dyspnea, tachycardia, hypoxia, and tachypnea after a long flight, combined with signs of a right calf DVT (warmth, swelling, tenderness), strongly suggest a pulmonary embolism. The nurse's first action is always the one that supports airway, breathing, and circulation while escalating care, and applying supplemental oxygen while notifying the provider immediately accomplishes both. Diagnostic confirmation such as ECG, CT angiography, or D-dimer testing, and anticoagulation, follow once the provider is involved, not before.",
+  "keyPoint": "Long flight, unilateral leg swelling, and sudden pleuritic chest pain and dyspnea together mean think PE first, and act on oxygenation before diagnostics."
+}

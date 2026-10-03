@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import type { NormalizedQuestion } from "@/lib/content/types";
 import { useSlidePlan } from "@/lib/slides/useSlidePlan";
 import { ScaledSlide } from "@/components/slides/ScaledSlide";
@@ -12,6 +13,9 @@ import type { TemplateId } from "@/lib/slides/types";
 function DownloadSlideButton({ question, templateId, slideIndex, ctaText }: { question: NormalizedQuestion; templateId: TemplateId; slideIndex: number; ctaText: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState<{ count: number; questionId: string } | null>(null);
+  const [saveWarning, setSaveWarning] = useState<string | null>(null);
+
   return (
     <div className="flex flex-col items-center gap-2">
       <button
@@ -20,6 +24,8 @@ function DownloadSlideButton({ question, templateId, slideIndex, ctaText }: { qu
         onClick={async () => {
           setBusy(true);
           setError(null);
+          setSaved(null);
+          setSaveWarning(null);
           try {
             const res = await fetch("/api/export/png", {
               method: "POST",
@@ -30,6 +36,17 @@ function DownloadSlideButton({ question, templateId, slideIndex, ctaText }: { qu
               const body = await res.json().catch(() => null);
               throw new Error(body?.error ?? `Download failed (${res.status})`);
             }
+
+            // Generating an image also files the question away in the bank, so
+            // say so rather than leaving the user to wonder whether it stuck.
+            const bankId = res.headers.get("X-Bank-Question-Id");
+            const bankCount = res.headers.get("X-Bank-Slide-Count");
+            if (res.headers.get("X-Bank-Saved") === "true" && bankId) {
+              setSaved({ count: Number(bankCount ?? 1), questionId: bankId });
+            } else {
+              setSaveWarning(res.headers.get("X-Bank-Error") ?? "The image downloaded, but could not be saved to the question bank.");
+            }
+
             const disposition = res.headers.get("Content-Disposition") ?? "";
             const match = disposition.match(/filename="([^"]+)"/);
             const filename = match ? match[1] : `question-${question.index}-slide-${slideIndex + 1}.png`;
@@ -53,6 +70,15 @@ function DownloadSlideButton({ question, templateId, slideIndex, ctaText }: { qu
         {busy ? "Rendering…" : "Download this PNG"}
       </button>
       {error && <p className="max-w-xs text-center text-xs text-red-400">{error}</p>}
+      {saved && (
+        <p className="max-w-xs text-center text-xs text-green-700">
+          Saved to the question bank with all {saved.count} image{saved.count > 1 ? "s" : ""}.{" "}
+          <Link href="/questions" className="underline">
+            View
+          </Link>
+        </p>
+      )}
+      {saveWarning && <p className="max-w-xs text-center text-xs text-amber-700">{saveWarning}</p>}
     </div>
   );
 }

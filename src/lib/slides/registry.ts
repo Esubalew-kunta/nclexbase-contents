@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import type { NormalizedQuestion } from "@/lib/content/types";
 import type { AnswerBlock, QuestionBlock } from "./blocks";
+import type { DensityTier } from "./density";
 import type { TemplateId, TemplateMeta } from "./types";
 
 export interface TemplateBudgets {
@@ -22,9 +23,12 @@ export interface SlideFrameProps<B> {
   overallIndex: number;
   overallTotal: number;
   /** Uniform content scale chosen by shrink-to-fit (see useSlidePlan). 1 means
-   * render at full size. Frames apply it to the block column only, never to
-   * the header band or footer, which must stay at full size on every slide. */
+   * render at full size. Frames apply it to the block column only, never to the
+   * header band or footer, which must stay at full size on every slide. */
   scale?: number;
+  /** Font-density tier for this slide's content (see density.ts). Frames pass it
+   *  to SlideContent, which is the only place the scale is turned into CSS. */
+  densityTier?: DensityTier;
 }
 
 export interface TemplateModule {

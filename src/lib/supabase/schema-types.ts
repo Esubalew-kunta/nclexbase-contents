@@ -49,15 +49,11 @@ export interface TelegramPostSnapshot {
   pollOptions: string[];
   correctOptionIds: number[];
   /** Plain text for the poll's native lamp-icon field, already inside
-   * Telegram's 200-char cap (see buildQuizExplanation). */
+   * Telegram's 200-char cap (see buildQuizExplanation). Telegram reveals this
+   * only to a member who has already voted, which is why it is the sole place
+   * the explanation is published — a second channel message would spoil the
+   * poll for everyone still to answer it. */
   quizExplanation: string | null;
-  /** HTML rendering of the follow-up message, sent with parse_mode = HTML so
-   * the "Why" / "Why the other options are wrong" / "NCLEX Key Point" headers
-   * actually render as headers. Null when there's nothing extra to say. */
-  followUpHtml: string | null;
-  /** The same follow-up as plain text — the legacy field, kept so snapshots
-   * written before followUpHtml existed still have a readable body. */
-  followUpText: string | null;
   /** True when the poll must accept more than one answer. Driven by the
    * actual number of correct options rather than the declared question type,
    * so a "select all that apply" that happens to have one right answer is
@@ -79,6 +75,10 @@ export interface TelegramScheduledPostRow {
   published_at: string | null;
   error_message: string | null;
   attempt_count: number;
+  /** Position within the day's set of posts, 0-based. Every post of a day is
+   *  sent at the same wall-clock time, so this is what tells them apart and
+   *  keeps their order deterministic. */
+  slot_index: number | null;
   created_at: string;
   updated_at: string;
 }

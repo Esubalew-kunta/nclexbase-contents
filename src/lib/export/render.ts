@@ -11,11 +11,25 @@ export interface RenderedSlide {
   filename: string;
 }
 
+/** Rendered when content cannot be made to fit a slide at all. Thrown rather
+ *  than warned about: the alternative is shipping a PNG with the bottom of an
+ *  answer sliced off, which looks like a bug to the audience and cannot be
+ *  undone once it is posted. */
+export class SlideOverflowError extends Error {
+  constructor(readonly overflow: { kind: string; blockIds: string[]; tier: string }[]) {
+    super(
+      `Content does not fit on a slide, even at the smallest text size. ` +
+        overflow.map((o) => `${o.kind} section: ${o.blockIds.join(", ")} (density "${o.tier}")`).join("; "),
+    );
+    this.name = "SlideOverflowError";
+  }
+}
+
 /** Renders every slide for one question through the real /print page (the
- * exact same React templates + pagination the live preview uses) and
- * screenshots each slide element at its true 1080x1920 size. Retries once on
- * a crashed browser/page (e.g. after the dev server itself restarted and
- * orphaned the old Chromium process). */
+ *  exact same React templates + pagination the live preview uses) and
+ *  screenshots each slide element at its true 1080x1920 size. Retries once on
+ *  a crashed browser/page (e.g. after the dev server itself restarted and
+ *  orphaned the old Chromium process). */
 export async function renderQuestionSlides(question: NormalizedQuestion, templateId: TemplateId, ctaText: string, origin: string): Promise<RenderedSlide[]> {
   let attempt = 0;
   for (;;) {
@@ -27,6 +41,12 @@ export async function renderQuestionSlides(question: NormalizedQuestion, templat
       try {
         await page.goto(`${origin}/print?token=${token}`, { waitUntil: "load" });
         await page.waitForFunction(() => window.__READY__ === true, { timeout: 15000 });
+
+        // Checked before screenshotting: once a block is taller than the slide it
+        // will overflow no matter what, and a clipped answer is worse than no
+        // image at all.
+        const overflow = await page.evaluate(() => window.__OVERFLOW__ ?? []);
+        if (overflow.length > 0) throw new SlideOverflowError(overflow);
 
         const kinds = await page.evaluate(() => window.__SLIDE_KINDS__ ?? []);
         const counts: Record<string, number> = {};
@@ -45,6 +65,8 @@ export async function renderQuestionSlides(question: NormalizedQuestion, templat
         await page.close();
       }
     } catch (err) {
+      // A genuine layout failure, not a dead browser: retrying cannot help.
+      if (err instanceof SlideOverflowError) throw err;
       const message = err instanceof Error ? err.message : String(err);
       if (attempt < 2 && /crash|closed|disconnected/i.test(message)) {
         continue; // the shared browser died mid-render — getBrowser() will relaunch it

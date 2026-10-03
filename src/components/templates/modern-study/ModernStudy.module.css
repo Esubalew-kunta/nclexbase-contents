@@ -40,28 +40,28 @@
   opacity: 0.9;
 }
 .brand {
-  font-size: 25px;
+  font-size: calc(25px * var(--density-scale, 1));
   font-weight: 700;
   letter-spacing: 0.08em;
   color: rgba(255, 255, 255, 0.75);
   text-transform: uppercase;
 }
 .cat {
-  font-size: 23px;
+  font-size: calc(23px * var(--density-scale, 1));
   font-weight: 600;
   letter-spacing: 0.03em;
   color: #c9a34e;
   display: block;
 }
 .qlabel {
-  font-size: 36px;
+  font-size: calc(36px * var(--density-scale, 1));
   font-weight: 800;
   color: #ffffff;
   text-transform: uppercase;
   letter-spacing: 0.01em;
 }
 .contLabel {
-  font-size: 26px;
+  font-size: calc(26px * var(--density-scale, 1));
   font-weight: 700;
   color: rgba(255, 255, 255, 0.85);
 }
@@ -74,7 +74,7 @@
   flex-direction: column;
 }
 .instructions {
-  font-size: 26px;
+  font-size: calc(26px * var(--density-scale, 1));
   font-weight: 700;
   color: #0e5a5c;
   margin: -14px 0 24px;
@@ -99,7 +99,7 @@
 
 /* ---- blocks ---- */
 .qtext {
-  font-size: 58px;
+  font-size: calc(46px * var(--density-scale, 1));
   font-weight: 800;
   line-height: 1.28;
   color: #173133;
@@ -122,7 +122,7 @@
   background: #0e5a5c;
   color: #fff;
   font-weight: 800;
-  font-size: 26px;
+  font-size: calc(26px * var(--density-scale, 1));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -134,18 +134,18 @@
   flex: 0 0 46px;
   width: 46px;
   height: 46px;
-  font-size: 21px;
+  font-size: calc(21px * var(--density-scale, 1));
 }
 .badgeFillSm {
   flex: 0 0 46px;
   width: 46px;
   height: 46px;
-  font-size: 21px;
+  font-size: calc(21px * var(--density-scale, 1));
   background: #0e5a5c;
   color: #fff;
 }
 .optText {
-  font-size: 36px;
+  font-size: calc(36px * var(--density-scale, 1));
   line-height: 1.4;
   color: #173133;
   font-weight: 600;
@@ -174,7 +174,7 @@
 }
 .correctLabel {
   display: block;
-  font-size: 22px;
+  font-size: calc(22px * var(--density-scale, 1));
   font-weight: 800;
   letter-spacing: 0.08em;
   color: #0e5a5c;
@@ -184,7 +184,7 @@
   color: #c9a34e;
 }
 .correctText {
-  font-size: 38px;
+  font-size: calc(38px * var(--density-scale, 1));
   font-weight: 700;
   color: #173133;
   margin: 0;
@@ -198,7 +198,7 @@
   padding: 30px 32px;
 }
 .h {
-  font-size: 24px;
+  font-size: calc(24px * var(--density-scale, 1));
   font-weight: 800;
   letter-spacing: 0.06em;
   color: #0e5a5c;
@@ -206,14 +206,14 @@
   text-transform: uppercase;
 }
 .p {
-  font-size: 32px;
+  font-size: calc(32px * var(--density-scale, 1));
   line-height: 1.5;
   color: #173133;
   margin: 0;
   font-weight: 500;
 }
 .pSm {
-  font-size: 28px;
+  font-size: calc(28px * var(--density-scale, 1));
   line-height: 1.45;
   padding-top: 4px;
 }
@@ -231,14 +231,14 @@
 }
 .kplabel {
   display: block;
-  font-size: 22px;
+  font-size: calc(22px * var(--density-scale, 1));
   font-weight: 800;
   letter-spacing: 0.08em;
   color: #c9a34e;
   margin-bottom: 10px;
 }
 .kptext {
-  font-size: 32px;
+  font-size: calc(32px * var(--density-scale, 1));
   line-height: 1.45;
   color: #173133;
   margin: 0;
@@ -264,14 +264,14 @@
   justify-content: center;
 }
 .ctaTitle {
-  font-size: 30px;
+  font-size: calc(30px * var(--density-scale, 1));
   font-weight: 800;
   color: #173133;
   margin: 0 0 5px;
   letter-spacing: -0.01em;
 }
 .ctaSub {
-  font-size: 22px;
+  font-size: calc(22px * var(--density-scale, 1));
   font-weight: 700;
   color: #173133;
   margin: 0;

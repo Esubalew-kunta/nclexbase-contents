@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_ANSWER_SLIDES, MAX_QUESTION_SLIDES, mergeTrailingGroup, MIN_SCALE, packIndices, SCALE_STEPS, scaledBodyWidthPercent } from "./pack";
+import { fallbackLayout, layoutsFor, MAX_ANSWER_SLIDES, MAX_QUESTION_SLIDES, mergeTrailingGroup, MIN_SCALE, packIndices, SCALE_STEPS, scaledBodyWidthPercent } from "./pack";
 
 describe("packIndices", () => {
   it("puts everything in one group when it all fits", () => {
@@ -180,5 +180,69 @@ describe("shrink-to-fit end to end", () => {
     const tall = { q: [4000, 4000, 4000, 4000], a: [4000, 4000, 4000, 4000] };
     const result = planAt({ 1: tall, 0.7: tall }, 1550, 0);
     expect(result).toBeNull();
+  });
+});
+
+describe("overflow detection", () => {
+  /** Mirrors how the hook measures: one entry per candidate zoom, largest
+   *  first, each with the block heights actually rendered at that zoom. */
+  function measured(entries: Record<number, number[]>) {
+    return SCALE_STEPS.map((scale) => ({ scale, heights: entries[scale] ?? [] })).filter((m) => m.heights.length > 0);
+  }
+
+  it("accepts a clean layout with no oversized block", () => {
+    const layouts = layoutsFor(measured({ 1: [100, 200], 0.9: [90, 180] }), 1000, 0, 1);
+    expect(layouts[0].scale).toBe(1);
+    expect(layouts[0].overflow).toBe(false);
+  });
+
+  it("rejects every layout where a single block is taller than the whole budget", () => {
+    // 5000px of text cannot share a slide with anything and cannot be shrunk
+    // into the budget by these zooms, so no layout qualifies.
+    const layouts = layoutsFor(measured({ 1: [5000], 0.7: [3500] }), 1000, 0, 2);
+    expect(layouts).toHaveLength(0);
+  });
+
+  it("names the blocks that are too tall, so the caller can act on them", () => {
+    const layout = fallbackLayout([{ scale: 0.7, heights: [100, 5000, 100] }], 1000, 0);
+    expect(layout.overflow).toBe(true);
+    expect(layout.overflowing).toEqual([1]);
+  });
+
+  it("reports no overflow when the tallest block exactly fills the budget", () => {
+    const layout = fallbackLayout([{ scale: 1, heights: [1000] }], 1000, 0);
+    expect(layout.overflow).toBe(false);
+  });
+
+  it("falls back to the smallest zoom rather than the largest", () => {
+    // Deliberately pick the smallest available so more text fits. Returning the
+    // largest here would hand back a layout that overflows when a better one was
+    // measured and available.
+    const layout = fallbackLayout(
+      [
+        { scale: 1, heights: [4000, 4000] },
+        { scale: 0.7, heights: [900, 900] },
+      ],
+      1000,
+      0,
+    );
+    expect(layout.scale).toBe(0.7);
+  });
+
+  it("enforces the slide cap as well as the overflow check", () => {
+    // Nothing overflows, but two 600px blocks need two slides. A caller asking
+    // for one must not get it.
+    expect(layoutsFor(measured({ 1: [600, 600], 0.7: [420, 420] }), 1000, 0, 1)).toHaveLength(1);
+  });
+
+  it("lets a multi-slide layout through when the cap allows it", () => {
+    const layouts = layoutsFor(measured({ 1: [600, 600] }), 1000, 0, 2);
+    expect(layouts).toHaveLength(1);
+    expect(layouts[0].groups).toEqual([[0], [1]]);
+  });
+
+  it("ignores a measurement with no blocks at all", () => {
+    // Guards the hook's "nothing measured yet" path from inventing a layout.
+    expect(layoutsFor([{ scale: 1, heights: [] }], 1000, 0, 1)).toHaveLength(0);
   });
 });

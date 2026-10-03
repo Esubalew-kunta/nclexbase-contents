@@ -2,6 +2,12 @@ import type { NormalizedQuestion } from "@/lib/content/types";
 import { getSupabaseAdmin } from "./server";
 import type { NclexQuestionRow } from "./schema-types";
 
+/** The only question types the Telegram calendar is allowed to place. Priority
+ *  and SATA are the two that post as a poll and the two the automatic fill
+ *  handles; every other type (including bowtie, which Telegram cannot grade)
+ *  stays in the bank and is placed by hand if at all. */
+export const SCHEDULABLE_TYPES = ["priority", "sata"] as const;
+
 function toRow(q: NormalizedQuestion) {
   return {
     external_id: q.id ?? null,
@@ -59,6 +65,26 @@ export async function listUnscheduledQuestions(): Promise<NclexQuestionRow[]> {
     query = query.not("id", "in", `(${activeIds.join(",")})`);
   }
   const { data, error } = await query;
+  if (error) throw error;
+  return data as unknown as NclexQuestionRow[];
+}
+
+/** Every question the calendar is allowed to offer, whether or not it already
+ *  holds a slot.
+ *
+ *  Restricted to Priority and SATA deliberately. Those are the two shapes the
+ *  automatic fill places and the two the admin asked to pick from by hand;
+ *  everything else stays visible on the bank page but out of the picker. Bowtie
+ *  in particular cannot go to Telegram at all — it is graded in three
+ *  independent groups — so offering it would only produce a dead end. */
+export async function listPostableForCalendar(): Promise<NclexQuestionRow[]> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db
+    .from("nclex_questions")
+    .select("*")
+    .in("type", [...SCHEDULABLE_TYPES])
+    .order("created_at", { ascending: false })
+    .limit(500);
   if (error) throw error;
   return data as unknown as NclexQuestionRow[];
 }

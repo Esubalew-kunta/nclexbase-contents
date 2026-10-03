@@ -27,6 +27,21 @@ export function checkTelegramCompatibility(q: NormalizedQuestion): TelegramCompa
   if (q.format !== "single" && q.format !== "multiple") {
     return { compatible: false, reason: `"${q.format}" questions don't map to a Telegram quiz poll (no single set of lettered correct options).` };
   }
+  // Telegram's quiz poll type grades against exactly one correct option — there
+  // is no "select all that apply" quiz on the platform, whatever `is_multiple`
+  // in the Bot API docs might suggest (that flag only changes how a REGULAR,
+  // non-quiz poll lets someone vote; it does not add multi-answer grading to a
+  // quiz). Sending more than one correct_option_id to a quiz poll is rejected
+  // outright by Telegram with QUIZ_CORRECT_ANSWERS_TOO_MUCH — discovered by
+  // actually publishing a multi-answer SATA question end to end, not by reading
+  // the docs. A SATA question with two or more correct answers is therefore
+  // unrepresentable here, same as bowtie; it stays in the bank for image export.
+  if (q.format === "multiple" && q.correctAnswers.length > 1) {
+    return {
+      compatible: false,
+      reason: "Telegram's quiz poll only supports one correct answer. A \"select all that apply\" question with more than one correct option can't be posted as a quiz — image export is still available.",
+    };
+  }
   if (q.options.length === 0) {
     return { compatible: false, reason: "This question has no options to poll." };
   }

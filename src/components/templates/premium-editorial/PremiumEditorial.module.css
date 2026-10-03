@@ -13,10 +13,13 @@
 .numeral {
   position: absolute;
   top: -36px;
-  right: -14px;
+  /* Flush with the card's right edge rather than 14px past it: the card reaches
+     the slide's own padding edge, so a negative offset pushed this decorative
+     numeral outside the 1080px canvas where the screenshot clipped it. */
+  right: 0;
   font-family: var(--font-source-serif), serif;
   font-weight: 700;
-  font-size: 460px;
+  font-size: calc(460px * var(--density-scale, 1));
   color: rgba(14, 90, 92, 0.07);
   line-height: 1;
   z-index: 0;
@@ -41,7 +44,7 @@
   display: block;
 }
 .brand {
-  font-size: 24px;
+  font-size: calc(24px * var(--density-scale, 1));
   font-weight: 600;
   letter-spacing: 0.16em;
   color: #173133;
@@ -49,7 +52,7 @@
 }
 .cat {
   font-family: var(--font-source-serif), serif;
-  font-size: 27px;
+  font-size: calc(27px * var(--density-scale, 1));
   font-weight: 700;
   font-style: italic;
   letter-spacing: 0.01em;
@@ -69,7 +72,7 @@
 .instructions {
   font-family: var(--font-source-serif), serif;
   font-style: italic;
-  font-size: 26px;
+  font-size: calc(26px * var(--density-scale, 1));
   color: #0e5a5c;
   margin: -24px 0 24px;
   position: relative;
@@ -100,7 +103,7 @@
   background: #c9a34e;
 }
 .footbrand {
-  font-size: 19px;
+  font-size: calc(19px * var(--density-scale, 1));
   letter-spacing: 0.14em;
   color: #8a9896;
   font-weight: 600;
@@ -108,7 +111,7 @@
 .contLabel {
   font-family: var(--font-source-serif), serif;
   font-style: italic;
-  font-size: 24px;
+  font-size: calc(24px * var(--density-scale, 1));
   color: #8a9896;
   margin-bottom: 24px;
   display: block;
@@ -117,7 +120,7 @@
 /* ---- blocks ---- */
 .qtext {
   font-family: var(--font-source-serif), serif;
-  font-size: 58px;
+  font-size: calc(46px * var(--density-scale, 1));
   font-weight: 700;
   line-height: 1.32;
   color: #173133;
@@ -134,22 +137,22 @@
 .letter {
   font-family: var(--font-source-serif), serif;
   font-weight: 700;
-  font-size: 34px;
+  font-size: calc(34px * var(--density-scale, 1));
   color: #c9a34e;
   flex: 0 0 42px;
 }
 .letterSm {
-  font-size: 28px;
+  font-size: calc(28px * var(--density-scale, 1));
   flex: 0 0 36px;
 }
 .rowText {
-  font-size: 34px;
+  font-size: calc(34px * var(--density-scale, 1));
   line-height: 1.4;
   color: #173133;
   font-weight: 400;
 }
 .rowTextSm {
-  font-size: 30px;
+  font-size: calc(30px * var(--density-scale, 1));
   line-height: 1.45;
 }
 
@@ -168,13 +171,13 @@
 }
 .quotemark {
   font-family: var(--font-source-serif), serif;
-  font-size: 76px;
+  font-size: calc(76px * var(--density-scale, 1));
   color: #c9a34e;
   line-height: 0.5;
 }
 .quotetext {
   font-family: var(--font-source-serif), serif;
-  font-size: 42px;
+  font-size: calc(42px * var(--density-scale, 1));
   font-weight: 600;
   color: #173133;
   line-height: 1.35;
@@ -184,13 +187,13 @@
 .sectionHead {
   font-family: var(--font-source-serif), serif;
   font-style: italic;
-  font-size: 29px;
+  font-size: calc(29px * var(--density-scale, 1));
   font-weight: 700;
   color: #0e5a5c;
   margin: 0 0 16px;
 }
 .p {
-  font-size: 34px;
+  font-size: calc(34px * var(--density-scale, 1));
   line-height: 1.5;
   color: #173133;
   margin: 0;
@@ -205,13 +208,13 @@
   display: block;
   font-family: var(--font-source-serif), serif;
   font-style: italic;
-  font-size: 25px;
+  font-size: calc(25px * var(--density-scale, 1));
   font-weight: 700;
   color: #c9a34e;
   margin-bottom: 12px;
 }
 .kptext {
-  font-size: 32px;
+  font-size: calc(32px * var(--density-scale, 1));
   line-height: 1.45;
   color: #173133;
   margin: 0;
@@ -239,13 +242,13 @@
 }
 .ctaTitle {
   font-family: var(--font-source-serif), serif;
-  font-size: 29px;
+  font-size: calc(29px * var(--density-scale, 1));
   font-weight: 800;
   color: #173133;
   margin: 0 0 5px;
 }
 .ctaSub {
-  font-size: 21px;
+  font-size: calc(21px * var(--density-scale, 1));
   font-weight: 700;
   color: #173133;
   margin: 0;

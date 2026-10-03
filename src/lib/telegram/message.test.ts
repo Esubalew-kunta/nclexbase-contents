@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { NormalizedQuestion } from "@/lib/content/types";
 import { checkTelegramCompatibility } from "./compat";
-import { buildFollowUpMessage, buildQuizExplanation, escapeTelegramHtml, renderFollowUpHtml, renderFollowUpPlain, truncateAtWord } from "./message";
+import { buildQuizExplanation, MAX_LAMP_LEN, truncateAtWord } from "./message";
 import { buildTelegramSnapshot } from "./snapshot";
 
 function makeQuestion(over: Partial<NormalizedQuestion> = {}): NormalizedQuestion {
@@ -18,7 +18,11 @@ function makeQuestion(over: Partial<NormalizedQuestion> = {}): NormalizedQuestio
       { label: "C", text: "Urine output 45 mL/hr" },
       { label: "D", text: "Pain 2 of 10" },
     ],
-    correctAnswers: ["A", "B", "C"],
+    // A single correct answer by default: most of this file's tests are about
+    // something else (lamp truncation, payload shape, ...) and shouldn't also
+    // have to navigate Telegram's one-correct-answer-per-quiz limit. Tests
+    // specifically about multi-answer behaviour override this.
+    correctAnswers: ["A"],
     correctAnswerText: null,
     explanation: "Fever, tachycardia and oliguria all indicate deteriorating perfusion and need escalation.",
     optionRationales: { D: "Pain of 2 out of 10 is expected after ambulation and does not need escalation." },
@@ -29,20 +33,6 @@ function makeQuestion(over: Partial<NormalizedQuestion> = {}): NormalizedQuestio
     ...over,
   };
 }
-
-describe("escapeTelegramHtml", () => {
-  it("escapes the three characters Telegram treats as markup", () => {
-    expect(escapeTelegramHtml('a & b < c > d')).toBe("a &amp; b &lt; c &gt; d");
-  });
-
-  it("escapes ampersands before the entities it introduces, never double-escaping", () => {
-    expect(escapeTelegramHtml("&lt;")).toBe("&amp;lt;");
-  });
-
-  it("leaves quotes and slashes alone", () => {
-    expect(escapeTelegramHtml('say "hi" a/b')).toBe('say "hi" a/b');
-  });
-});
 
 describe("truncateAtWord", () => {
   it("returns short text untouched", () => {
@@ -68,100 +58,59 @@ describe("truncateAtWord", () => {
 
 describe("buildQuizExplanation", () => {
   it("returns null for a question with no explanation", () => {
-    expect(buildQuizExplanation(makeQuestion({ explanation: null }))).toEqual({ lampText: null, overflowText: null });
+    expect(buildQuizExplanation(makeQuestion({ explanation: null }))).toEqual({ lampText: null, fullText: null, fullLength: 0, truncated: false });
   });
 
   it("treats whitespace-only as absent", () => {
-    expect(buildQuizExplanation(makeQuestion({ explanation: "   " }))).toEqual({ lampText: null, overflowText: null });
+    expect(buildQuizExplanation(makeQuestion({ explanation: "   " })).lampText).toBeNull();
   });
 
   it("keeps a short explanation entirely in the lamp field", () => {
     const result = buildQuizExplanation(makeQuestion());
     expect(result.lampText).toBe("Fever, tachycardia and oliguria all indicate deteriorating perfusion and need escalation.");
-    expect(result.overflowText).toBeNull();
+    expect(result.truncated).toBe(false);
+    expect(result.fullLength).toBe(result.lampText!.length);
   });
 
-  it("moves a long explanation to the follow-up and teases it in the lamp", () => {
-    const long = "Because ".repeat(60);
+  it("never exceeds the lamp cap", () => {
+    const result = buildQuizExplanation(makeQuestion({ explanation: "Because ".repeat(60) }));
+    expect(result.lampText!.length).toBeLessThanOrEqual(MAX_LAMP_LEN);
+    expect(result.truncated).toBe(true);
+  });
+
+  it("still reports the full length so the UI can show what got cut", () => {
+    const long = "Because ".repeat(60).trim();
     const result = buildQuizExplanation(makeQuestion({ explanation: long }));
-    // The FULL text is preserved (only surrounding whitespace is stripped) —
-    // the reasoning is never truncated away.
-    expect(result.overflowText).toBe(long.trim());
-    expect(result.overflowText).toHaveLength(long.trim().length);
-    expect(result.lampText!.length).toBeLessThanOrEqual(200);
-    expect(result.lampText!.length).toBeLessThan(result.overflowText!.length);
-  });
-});
-
-describe("buildFollowUpMessage", () => {
-  it("returns null when there is genuinely nothing extra to say", () => {
-    const q = makeQuestion({
-      explanation: null,
-      keyPoint: null,
-      optionRationales: {},
-    });
-    expect(buildFollowUpMessage(q)).toBeNull();
+    expect(result.fullText).toBe(long);
+    expect(result.fullLength).toBe(long.length);
+    expect(result.fullLength).toBeGreaterThan(MAX_LAMP_LEN);
   });
 
-  it("never repeats a correct option as a rationale", () => {
-    const model = buildFollowUpMessage(makeQuestion())!;
-    expect(model.rationales.map((r) => r.label)).toEqual(["D"]);
-  });
-
-  it("skips options that have no supplied rationale rather than inventing one", () => {
-    const model = buildFollowUpMessage(makeQuestion({ optionRationales: { D: "" } }))!;
-    expect(model.rationales).toEqual([]);
-  });
-
-  it("carries the full explanation when it overflowed the lamp", () => {
-    const long = "Rationale ".repeat(50);
-    const model = buildFollowUpMessage(makeQuestion({ explanation: long }))!;
-    expect(model.whyText).toBe(long.trim());
-    expect(model.whyText!.length).toBeGreaterThan(200);
-  });
-
-  it("omits the Why section when the explanation already fit in the lamp", () => {
-    expect(buildFollowUpMessage(makeQuestion())!.whyText).toBeNull();
-  });
-});
-
-describe("follow-up rendering", () => {
-  it("escapes user text in the HTML rendering", () => {
-    const model = { whyText: null, rationales: [{ label: "A", text: "give <b>push</b> & call" }], keyPoint: null };
-    const html = renderFollowUpHtml(model);
-    expect(html).toContain("&lt;b&gt;");
-    expect(html).toContain("&amp;");
-    expect(html).not.toContain("<b>push</b>");
-  });
-
-  it("uses only tags Telegram's HTML parse mode supports", () => {
-    const model = { whyText: "why", rationales: [{ label: "A", text: "r" }], keyPoint: "kp" };
-    const tags = renderFollowUpHtml(model).match(/<\/?([a-z]+)>/g) ?? [];
-    const allowed = new Set(["b", "i", "u", "s", "code", "pre", "a", "blockquote"]);
-    for (const tag of tags) {
-      expect(allowed.has(tag.replace(/<\/?/, "").replace(">", ""))).toBe(true);
-    }
-  });
-
-  it("bolds the section headers so they render as headers", () => {
-    const model = buildFollowUpMessage(makeQuestion())!;
-    const html = renderFollowUpHtml(model);
-    expect(html).toContain("<b>Why the other options are wrong</b>");
-    expect(html).toContain("<b>NCLEX Key Point</b>");
-  });
-
-  it("strips the tags from the plain rendering, leaving identical text", () => {
-    const model = { whyText: "why text", rationales: [{ label: "A", text: "rationale" }], keyPoint: "key point" };
-    const stripped = renderFollowUpHtml(model).replace(/<\/?b>/g, "");
-    expect(stripped).toBe(renderFollowUpPlain(model));
+  it("never carries the wrong-option rationales or the key point", () => {
+    // Both used to be published in a follow-up message, which meant they were
+    // readable in the channel before anyone voted. The lamp is the only place
+    // the explanation goes now, so nothing may smuggle them back in.
+    const result = buildQuizExplanation(makeQuestion({ explanation: "Short answer." }));
+    expect(result.lampText).toBe("Short answer.");
+    expect(result.lampText).not.toContain("escalation");
   });
 });
 
 describe("checkTelegramCompatibility", () => {
-  it("accepts a multi-answer question and returns every correct index", () => {
+  it("accepts a select-all question with a single correct answer", () => {
     const compat = checkTelegramCompatibility(makeQuestion());
     expect(compat.compatible).toBe(true);
-    expect(compat.correctOptionIds).toEqual([0, 1, 2]);
+    expect(compat.correctOptionIds).toEqual([0]);
+  });
+
+  it("rejects a select-all question with more than one correct answer", () => {
+    // Telegram's quiz poll grades against exactly one correct_option_id —
+    // confirmed by actually publishing one, which Telegram rejected outright
+    // with QUIZ_CORRECT_ANSWERS_TOO_MUCH. Same treatment as bowtie: stays in
+    // the bank for image export rather than silently failing at publish time.
+    const compat = checkTelegramCompatibility(makeQuestion({ correctAnswers: ["A", "B", "C"] }));
+    expect(compat.compatible).toBe(false);
+    expect(compat.reason).toMatch(/one correct answer/i);
   });
 
   it("excludes bowtie with a reason that names the image fallback", () => {
@@ -194,8 +143,8 @@ describe("checkTelegramCompatibility", () => {
 });
 
 describe("buildTelegramSnapshot", () => {
-  it("marks a genuinely multi-answer question as multiple", () => {
-    expect(buildTelegramSnapshot(makeQuestion()).isMultiple).toBe(true);
+  it("throws for a multi-answer question rather than building a snapshot Telegram will reject", () => {
+    expect(() => buildTelegramSnapshot(makeQuestion({ correctAnswers: ["A", "B", "C"] }))).toThrow(/one correct answer/i);
   });
 
   it("does not mark a select-all question as multiple when only one answer is correct", () => {
@@ -211,10 +160,17 @@ describe("buildTelegramSnapshot", () => {
     expect(buildTelegramSnapshot(q).isMultiple).toBe(false);
   });
 
-  it("produces the HTML follow-up the publisher now sends", () => {
+  it("produces a poll-only payload with no follow-up message", () => {
+    // A follow-up would be readable in the channel before anyone votes, which
+    // is exactly what the lamp field exists to avoid.
     const snapshot = buildTelegramSnapshot(makeQuestion());
-    expect(snapshot.followUpHtml).toContain("<b>NCLEX Key Point</b>");
-    expect(snapshot.followUpText).toContain("NCLEX Key Point");
+    expect(Object.keys(snapshot).sort()).toEqual(["correctOptionIds", "isMultiple", "pollOptions", "question", "quizExplanation"]);
+  });
+
+  it("does not leak the key point or the wrong-option rationales into the lamp", () => {
+    const snapshot = buildTelegramSnapshot(makeQuestion());
+    expect(snapshot.quizExplanation).not.toContain("Escalate on trends");
+    expect(snapshot.quizExplanation).not.toContain("expected after ambulation");
   });
 
   it("keeps the lamp explanation inside Telegram's 200-character cap", () => {

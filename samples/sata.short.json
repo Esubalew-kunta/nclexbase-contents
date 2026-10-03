@@ -1,0 +1,16 @@
+{
+  "id": "sata-short-01",
+  "type": "sata",
+  "question": "A nurse is teaching a client newly diagnosed with hypertension about lifestyle changes. Which statements by the client indicate correct understanding?",
+  "options": [
+    { "label": "A", "text": "I will limit my sodium intake to less than 2,300 mg a day." },
+    { "label": "B", "text": "I should stop taking my blood pressure pill once it's normal." },
+    { "label": "C", "text": "I will try to get at least 150 minutes of exercise weekly." },
+    { "label": "D", "text": "I can keep smoking as long as I take my medication." },
+    { "label": "E", "text": "I will limit alcohol to no more than one drink a day." },
+    { "label": "F", "text": "Losing even a little weight can help lower my blood pressure." }
+  ],
+  "correctAnswer": ["A", "C", "E", "F"],
+  "explanation": "Sodium restriction, regular aerobic exercise, moderate alcohol intake, and weight loss are all evidence-based lifestyle changes that lower blood pressure. Antihypertensive medication should never be stopped just because the pressure normalizes, and smoking must be addressed rather than excused by medication.",
+  "keyPoint": "Lifestyle changes work together with medication; they don't replace it."
+}

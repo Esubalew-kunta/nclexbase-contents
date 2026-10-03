@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import type { NormalizedQuestion } from "@/lib/content/types";
 import type { TemplateId } from "@/lib/slides/types";
 
@@ -17,12 +18,14 @@ async function downloadBlob(blob: Blob, filename: string) {
 
 export function ExportPanel({ questions, templateId, ctaText }: { questions: NormalizedQuestion[]; templateId: TemplateId; ctaText: string }) {
   const [status, setStatus] = useState<string | null>(null);
+  const [bankNote, setBankNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function handleExportZip() {
     if (questions.length === 0) return;
     setBusy(true);
     setStatus(`Rendering ${questions.length} question${questions.length === 1 ? "" : "s"}… this can take a little while.`);
+    setBankNote(null);
     try {
       const res = await fetch("/api/export/zip", {
         method: "POST",
@@ -33,6 +36,18 @@ export function ExportPanel({ questions, templateId, ctaText }: { questions: Nor
         const body = await res.json().catch(() => null);
         throw new Error(body?.error ?? `Export failed (${res.status})`);
       }
+
+      // Each question is filed in the bank as it renders. Report how many stuck,
+      // and which did not, rather than implying everything was saved.
+      const savedCount = Number(res.headers.get("X-Bank-Saved-Count") ?? 0);
+      const bankState = res.headers.get("X-Bank-Saved");
+      const bankError = res.headers.get("X-Bank-Error");
+      if (bankState === "true") {
+        setBankNote(`Saved to the question bank with their images (${savedCount}/${questions.length}).`);
+      } else {
+        setBankNote(`The ZIP downloaded, but ${questions.length - savedCount} question(s) could not be saved to the bank: ${bankError ?? "storage error"}`);
+      }
+
       const blob = await res.blob();
       await downloadBlob(blob, "NCLEXBase_Questions.zip");
       setStatus(`Downloaded NCLEXBase_Questions.zip (${questions.length} question${questions.length === 1 ? "" : "s"}).`);
@@ -54,6 +69,14 @@ export function ExportPanel({ questions, templateId, ctaText }: { questions: Nor
         {busy ? "Generating…" : `Download ZIP (${questions.length} question${questions.length === 1 ? "" : "s"})`}
       </button>
       {status && <p className="text-xs text-gray-500">{status}</p>}
+      {bankNote && (
+        <p className={`text-xs ${bankNote.startsWith("The ZIP") ? "text-amber-700" : "text-green-700"}`}>
+          {bankNote}{" "}
+          <Link href="/questions" className="underline">
+            Question bank
+          </Link>
+        </p>
+      )}
     </div>
   );
 }

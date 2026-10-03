@@ -2,9 +2,10 @@ import { errorMessage } from "@/lib/errorMessage";
 import { renderQuestionSlides } from "@/lib/export/render";
 import { DEFAULT_CTA_TEXT } from "@/lib/slides/chrome-copy";
 import type { TemplateId } from "@/lib/slides/types";
+import type { NormalizedQuestion } from "@/lib/content/types";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { removeQuestionSlidesByPrefix, uploadQuestionSlides } from "@/lib/supabase/storage";
-import { rowToNormalizedQuestion } from "@/lib/supabase/questions";
+import { rowToNormalizedQuestion, upsertQuestion } from "@/lib/supabase/questions";
 import type { NclexQuestionRow } from "@/lib/supabase/schema-types";
 
 // Server-only. Renders a stored question's slides to PNGs, stores them in
@@ -80,4 +81,52 @@ export async function clearQuestionSlides(questionId: string): Promise<void> {
     slide_error: null,
     slide_rendered_at: null,
   });
+}
+
+export interface SaveToBankResult {
+  questionId: string;
+  slideCount: number;
+}
+
+/** Registers an already-rendered question and its images into the question
+ *  bank. This is what makes "I generated the image" also mean "the question is
+ *  in my library" — previously the export route rendered slides, handed the bytes
+ *  to the browser and forgot them, so anything produced outside an explicit
+ *  import was invisible to the bank, the calendar and the schedule.
+ *
+ *  Uses the same `upsertQuestion` the import path uses, so a question with an
+ *  `id` in its source JSON updates the row it came from instead of forking a
+ *  duplicate. All slides of the question are stored, not just the one that was
+ *  downloaded, because the bank shows the set.
+ *
+ *  Deliberately never throws: this runs after the pixels are already rendered,
+ *  and a Supabase outage must not cost the user the image they asked for. The
+ *  failure is logged and the caller reports it as a warning. */
+export async function saveRenderedQuestionToBank(
+  question: NormalizedQuestion,
+  slides: { filename: string; buffer: Buffer }[],
+  templateId: TemplateId,
+): Promise<SaveToBankResult | { error: string }> {
+  try {
+    const row = await upsertQuestion(question);
+    const paths = await uploadQuestionSlides(row.id, slides);
+
+    const { error } = await getSupabaseAdmin()
+      .from("nclex_questions")
+      .update({
+        slide_status: paths.length > 0 ? "ready" : "none",
+        slide_paths: paths.length > 0 ? paths : null,
+        slide_error: null,
+        template_id: templateId,
+        slide_rendered_at: new Date().toISOString(),
+      })
+      .eq("id", row.id);
+    if (error) throw error;
+
+    return { questionId: row.id, slideCount: paths.length };
+  } catch (err) {
+    const message = errorMessage(err, "Could not save the question to the bank");
+    console.error("saveRenderedQuestionToBank failed:", err);
+    return { error: message };
+  }
 }

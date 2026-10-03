@@ -17,7 +17,7 @@ export function PostDetailsModal({ post, channel, onClose, onChanged }: { post: 
   const [editing, setEditing] = useState(false);
   const scheduledUtc = new Date(post.scheduled_at);
   const [dateStr, setDateStr] = useState(utcToZonedDateStr(scheduledUtc, post.timezone));
-  const [timeStr, setTimeStr] = useState(utcToZonedTimeStr(scheduledUtc, post.timezone));
+  const timeStr = utcToZonedTimeStr(scheduledUtc, post.timezone);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,14 +70,15 @@ export function PostDetailsModal({ post, channel, onClose, onChanged }: { post: 
 
         {editing && (
           <div className="mt-4 flex flex-col gap-2 rounded-lg bg-gray-50 p-3">
-            <label className="text-xs font-bold text-brand-dark">Date</label>
-            <input type="date" value={dateStr} onChange={(e) => setDateStr(e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-            <label className="text-xs font-bold text-brand-dark">Time</label>
-            <input type="time" value={timeStr} onChange={(e) => setTimeStr(e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+            <p className="text-xs text-gray-500">Move this post to another day. The posting time stays as set in Telegram settings unless you change it here.</p>
+            <label htmlFor="move-date" className="text-xs font-bold text-brand-dark">
+              Date
+            </label>
+            <input id="move-date" type="date" value={dateStr} onChange={(e) => setDateStr(e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
             <button
               type="button"
               disabled={busy}
-              onClick={() => patch({ action: "reschedule", dateStr, timeStr, timezone: post.timezone })}
+              onClick={() => patch({ action: "reschedule", dateStr, timezone: post.timezone })}
               className="mt-1 rounded-lg bg-brand-teal py-2 text-sm font-bold text-white disabled:opacity-50"
             >
               Save Changes

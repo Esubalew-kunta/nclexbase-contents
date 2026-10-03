@@ -131,14 +131,14 @@ export function AnswerBlockView({ block }: { block: AnswerBlock }) {
   }
 }
 
-export function QuestionFrame({ question, blocks, isContinuation, overallIndex, overallTotal, scale }: SlideFrameProps<QuestionBlock>) {
+export function QuestionFrame({ question, blocks, isContinuation, overallIndex, overallTotal, scale, densityTier }: SlideFrameProps<QuestionBlock>) {
   return (
     <div className={styles.canvas}>
       <Chrome question={question} numeral={question.index} label={QUESTION_LABEL} />
       {isContinuation && <span className={styles.contLabel}>Question, continued</span>}
       {!isContinuation && question.instructions && <p className={styles.instructions}>{question.instructions}</p>}
       <div className={styles.body}>
-        <SlideContent scale={scale} className={styles.content}>
+        <SlideContent scale={scale} densityTier={densityTier} className={styles.content}>
           {blocks.map((b) => (
             <QuestionBlockView key={b.id} block={b} />
           ))}
@@ -154,13 +154,13 @@ export function QuestionFrame({ question, blocks, isContinuation, overallIndex, 
   );
 }
 
-export function AnswerFrame({ question, blocks, isContinuation, overallIndex, overallTotal, scale }: SlideFrameProps<AnswerBlock>) {
+export function AnswerFrame({ question, blocks, isContinuation, overallIndex, overallTotal, scale, densityTier }: SlideFrameProps<AnswerBlock>) {
   return (
     <div className={styles.canvas}>
       <Chrome question={question} numeral={question.index} />
       {isContinuation && <span className={styles.contLabel}>Answer, continued</span>}
       <div className={styles.body}>
-        <SlideContent scale={scale} className={styles.content}>
+        <SlideContent scale={scale} densityTier={densityTier} className={styles.content}>
           {blocks.map((b) => (
             <AnswerBlockView key={b.id} block={b} />
           ))}

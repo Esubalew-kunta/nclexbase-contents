@@ -139,13 +139,13 @@ function Band({ question, title, isContinuation, contLabel }: { question: { cate
   );
 }
 
-export function QuestionFrame({ question, blocks, isContinuation, overallIndex, overallTotal, scale }: SlideFrameProps<QuestionBlock>) {
+export function QuestionFrame({ question, blocks, isContinuation, overallIndex, overallTotal, scale, densityTier }: SlideFrameProps<QuestionBlock>) {
   return (
     <div className={styles.canvas}>
       <Band question={question} title={QUESTION_LABEL} isContinuation={isContinuation} contLabel={`${QUESTION_LABEL} — Continued`} />
       <div className={styles.body}>
         {!isContinuation && question.instructions && <p className={styles.instructions}>{question.instructions}</p>}
-        <SlideContent scale={scale} className={styles.content}>
+        <SlideContent scale={scale} densityTier={densityTier} className={styles.content}>
           {blocks.map((b) => (
             <QuestionBlockView key={b.id} block={b} />
           ))}
@@ -160,12 +160,12 @@ export function QuestionFrame({ question, blocks, isContinuation, overallIndex, 
   );
 }
 
-export function AnswerFrame({ question, blocks, isContinuation, overallIndex, overallTotal, scale }: SlideFrameProps<AnswerBlock>) {
+export function AnswerFrame({ question, blocks, isContinuation, overallIndex, overallTotal, scale, densityTier }: SlideFrameProps<AnswerBlock>) {
   return (
     <div className={styles.canvas}>
       <Band question={{ category: "ANSWER REVEAL" }} title="" isContinuation={isContinuation} contLabel="ANSWER — CONTINUED" />
       <div className={styles.body}>
-        <SlideContent scale={scale} className={styles.content}>
+        <SlideContent scale={scale} densityTier={densityTier} className={styles.content}>
           {blocks.map((b) => (
             <AnswerBlockView key={b.id} block={b} />
           ))}

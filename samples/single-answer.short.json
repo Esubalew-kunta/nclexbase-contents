@@ -1,0 +1,19 @@
+{
+  "id": "priority-short-01",
+  "type": "priority",
+  "question": "A client who had a long-haul flight reports sudden pleuritic chest pain and shortness of breath. Which action should the nurse take first?",
+  "options": [
+    { "label": "A", "text": "Apply supplemental oxygen and notify the provider immediately" },
+    { "label": "B", "text": "Obtain a 12-lead ECG before doing anything else" },
+    { "label": "C", "text": "Document the complaint and reassess in 30 minutes" },
+    { "label": "D", "text": "Help the client to the bathroom to relieve the discomfort" }
+  ],
+  "correctAnswer": "A",
+  "optionRationales": {
+    "B": "An ECG is useful but delays the oxygen and provider notification a suspected pulmonary embolism needs right away.",
+    "C": "Waiting 30 minutes risks the client's airway and circulation in a possible PE.",
+    "D": "Ambulating a client with a suspected PE can dislodge a clot and is unsafe."
+  },
+  "explanation": "Sudden pleuritic chest pain and dyspnea after prolonged immobility (a long flight) are classic for pulmonary embolism. The nurse's first action is to support oxygenation and get the provider involved immediately, before further diagnostics.",
+  "keyPoint": "Sudden dyspnea plus pleuritic pain plus recent immobility: think PE first."
+}

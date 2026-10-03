@@ -27,14 +27,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 
     if (body.action === "reschedule") {
-      if (!body.dateStr || !body.timeStr || !body.timezone) {
-        return Response.json({ error: "dateStr, timeStr, and timezone are required to reschedule" }, { status: 400 });
+      if (!body.dateStr || !body.timezone) {
+        return Response.json({ error: "dateStr and timezone are required to reschedule" }, { status: 400 });
       }
       const result = await updateScheduledPost(id, { dateStr: body.dateStr, timeStr: body.timeStr, timezone: body.timezone });
-      // 409 rather than 500: the target slot is occupied, and the admin can act
-      // on that by picking a different slot.
+      // 409 rather than 500: the target day is already at capacity, and the
+      // admin can act on that by picking a different day.
       if (result.conflict) {
-        return Response.json({ conflict: true, existing: result.existing, error: "That slot is already taken" }, { status: 409 });
+        return Response.json({ conflict: true, existing: result.existing, error: "That day already has its full set of posts" }, { status: 409 });
       }
       return Response.json({ post: result.post });
     }
@@ -44,7 +44,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       const { replaceQuestionInSlot } = await import("@/lib/supabase/replace");
       const result = await replaceQuestionInSlot(id, body.contentId);
       if (result.error) return Response.json({ error: result.error }, { status: 400 });
-      return Response.json({ post: result.post });
+      // `swappedWith` tells the UI the two questions traded days, so the month
+      // grid refetches rather than assuming only this one cell changed.
+      return Response.json({ post: result.post, swappedWith: result.swappedWith ?? null });
     }
 
     return Response.json({ error: "Unknown action" }, { status: 400 });

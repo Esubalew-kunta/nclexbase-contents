@@ -5,8 +5,15 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CATEGORY_LABELS, type NormalizedQuestion } from "@/lib/content/types";
 import { BANK_FORMAT_LABELS, type BankFormat } from "@/lib/supabase/questions";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EditQuestionModal } from "./EditQuestionModal";
 import type { BankQuestion, BankFilter } from "./types";
+
+/** Short enough for a confirmation dialog without the question's full text
+ * burying the "are you sure" under three paragraphs. */
+function truncateQuestion(text: string): string {
+  return text.length > 70 ? `${text.slice(0, 70)}…` : text;
+}
 
 type Filter = BankFilter;
 
@@ -35,6 +42,9 @@ export function QuestionBankPage() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [editing, setEditing] = useState<BankQuestion | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirmTarget, setConfirmTarget] = useState<{ kind: "single"; question: BankQuestion } | { kind: "bulk"; ids: string[] } | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   // Debounce so typing in the search box doesn't fire a request per keystroke.
   useEffect(() => {
@@ -58,6 +68,20 @@ export function QuestionBankPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // A selection tied to rows that just scrolled out of view under a new
+  // filter is confusing — easier to start clean than to reconcile it. Cleared
+  // from the handlers that change `filter`/`search` below, not reactively
+  // from an effect watching them.
+  function changeFilter(next: Filter) {
+    setFilter(next);
+    setSelected(new Set());
+  }
+
+  function changeSearch(next: string) {
+    setSearch(next);
+    setSelected(new Set());
+  }
 
   // Tab counts come from a separate unfiltered fetch, so they stay stable while
   // the admin narrows the list rather than counting only what's on screen.
@@ -103,21 +127,46 @@ export function QuestionBankPage() {
     }
   }
 
-  async function remove(question: BankQuestion) {
-    const what = question.question.length > 70 ? `${question.question.slice(0, 70)}…` : question.question;
-    if (!window.confirm(`Delete this question?\n\n${what}\n\nIts stored images will be removed too, and any Telegram posts scheduled from it will be deleted.`)) return;
-    setBusyId(question.id);
+  function toggleSelected(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (!questions || questions.length === 0) return;
+    setSelected((prev) => {
+      const allVisible = questions.map((q) => q.id);
+      const everyVisibleSelected = allVisible.every((id) => prev.has(id));
+      return everyVisibleSelected ? new Set() : new Set(allVisible);
+    });
+  }
+
+  /** Runs after the confirm dialog's own "Delete" is pressed — the dialog
+   * itself never deletes anything, it only decides whether this runs. */
+  async function performDelete(ids: string[]) {
+    setConfirmBusy(true);
     setError(null);
-    try {
-      const res = await fetch(`/api/questions/${question.id}`, { method: "DELETE" });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? `Delete failed (${res.status})`);
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Delete failed");
-    } finally {
-      setBusyId(null);
+    let failures = 0;
+    for (const id of ids) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const res = await fetch(`/api/questions/${id}`, { method: "DELETE" });
+        // eslint-disable-next-line no-await-in-loop
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error ?? `Delete failed (${res.status})`);
+      } catch {
+        failures++;
+      }
     }
+    setConfirmBusy(false);
+    setConfirmTarget(null);
+    setSelected(new Set());
+    if (failures > 0) setError(`${failures} of ${ids.length} question${ids.length > 1 ? "s" : ""} could not be deleted.`);
+    await load();
   }
 
   /** Renders every question still missing an image, one at a time. Sequential
@@ -189,7 +238,7 @@ export function QuestionBankPage() {
             <button
               key={f.value}
               type="button"
-              onClick={() => setFilter(f.value)}
+              onClick={() => changeFilter(f.value)}
               className={`rounded-md px-3 py-1.5 ${filter === f.value ? "bg-white text-brand-dark shadow" : "text-gray-500"}`}
             >
               {f.label}
@@ -201,7 +250,7 @@ export function QuestionBankPage() {
         <input
           type="search"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => changeSearch(e.target.value)}
           placeholder="Search questions…"
           className="min-w-0 flex-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm outline-none focus:border-brand-teal"
         />
@@ -215,6 +264,29 @@ export function QuestionBankPage() {
           {bulkBusy ? "Generating…" : `Generate images${needsSlides.length > 0 ? ` (${needsSlides.length})` : ""}`}
         </button>
       </div>
+
+      {questions !== null && questions.length > 0 && (
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-gray-500">
+            <input
+              type="checkbox"
+              checked={questions.length > 0 && questions.every((q) => selected.has(q.id))}
+              onChange={toggleSelectAll}
+              className="h-4 w-4 accent-brand-teal"
+            />
+            Select all
+          </label>
+          {selected.size > 0 && (
+            <button
+              type="button"
+              onClick={() => setConfirmTarget({ kind: "bulk", ids: [...selected] })}
+              className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
+            >
+              Delete selected ({selected.size})
+            </button>
+          )}
+        </div>
+      )}
 
       {error && <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>}
 
@@ -238,6 +310,13 @@ export function QuestionBankPage() {
             return (
               <li key={q.id} className="rounded-xl border border-gray-200 bg-white p-4">
                 <div className="flex flex-col gap-4 sm:flex-row">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(q.id)}
+                    onChange={() => toggleSelected(q.id)}
+                    aria-label="Select question"
+                    className="mt-1 h-4 w-4 flex-none accent-brand-teal"
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="mb-2 flex flex-wrap items-center gap-2">
                       <span className="rounded-md bg-brand-teal/10 px-2 py-0.5 text-xs font-bold text-brand-teal">
@@ -276,7 +355,7 @@ export function QuestionBankPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => remove(q)}
+                        onClick={() => setConfirmTarget({ kind: "single", question: q })}
                         disabled={busy}
                         className="rounded-lg border border-red-200 px-3 py-2.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-40"
                       >
@@ -317,6 +396,27 @@ export function QuestionBankPage() {
             setEditing(null);
             await load();
           }}
+        />
+      )}
+
+      {confirmTarget && (
+        <ConfirmDialog
+          title={confirmTarget.kind === "bulk" ? `Delete ${confirmTarget.ids.length} questions?` : "Delete this question?"}
+          message={
+            confirmTarget.kind === "bulk" ? (
+              <>Their stored images will be removed too, and any Telegram posts scheduled from them will be deleted.</>
+            ) : (
+              <>
+                <span className="block font-medium text-gray-800">{truncateQuestion(confirmTarget.question.question)}</span>
+                <span className="mt-1 block">Its stored images will be removed too, and any Telegram post scheduled from it will be deleted.</span>
+              </>
+            )
+          }
+          confirmLabel="Delete"
+          danger
+          busy={confirmBusy}
+          onCancel={() => setConfirmTarget(null)}
+          onConfirm={() => performDelete(confirmTarget.kind === "bulk" ? confirmTarget.ids : [confirmTarget.question.id])}
         />
       )}
     </div>

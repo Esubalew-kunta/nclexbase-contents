@@ -7,13 +7,11 @@ import { utcToZonedDateStr, utcToZonedTimeStr } from "@/lib/telegram/timezone";
 import type { ScheduledPostWithQuestion } from "@/components/calendar/types";
 
 interface Settings {
-  daily_time: string;
+  dailyTime: string;
   timezone: string;
   channel: string | null;
   enabled: boolean;
-  /** One entry per daily posting slot. Absent on rows written before the
-   * setting existed, which is why the UI falls back to daily_time. */
-  post_times?: string[];
+  postsPerDay: number;
 }
 
 const STATUS_BADGE: Record<string, string> = {
@@ -23,9 +21,18 @@ const STATUS_BADGE: Record<string, string> = {
   failed: "bg-red-100 text-red-700",
 };
 
+type Bucket = "scheduled" | "published" | "failed";
+
+const BUCKET_TITLE: Record<Bucket, string> = {
+  scheduled: "Scheduled",
+  published: "Published",
+  failed: "Failed",
+};
+
 export function DashboardPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [posts, setPosts] = useState<ScheduledPostWithQuestion[] | null>(null);
+  const [openBucket, setOpenBucket] = useState<Bucket | null>(null);
   const [retrying, setRetrying] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
@@ -48,30 +55,22 @@ export function DashboardPage() {
   const tz = settings?.timezone ?? "UTC";
   const todayStr = utcToZonedDateStr(new Date(), tz);
 
-  const { todayCounts, upcoming, recent, failed } = useMemo(() => {
-    if (!posts) return { todayCounts: { scheduled: 0, published: 0, failed: 0 }, upcoming: [], recent: [], failed: [] };
-
-    const todayCounts = { scheduled: 0, published: 0, failed: 0 };
-    const upcoming: ScheduledPostWithQuestion[] = [];
-    const recent: ScheduledPostWithQuestion[] = [];
-    const failed: ScheduledPostWithQuestion[] = [];
+  const buckets = useMemo(() => {
+    const result: Record<Bucket, ScheduledPostWithQuestion[]> = { scheduled: [], published: [], failed: [] };
+    if (!posts) return result;
 
     for (const p of posts) {
       const dateStr = utcToZonedDateStr(new Date(p.scheduled_at), p.timezone);
-      if (dateStr === todayStr) {
-        if (p.status === "scheduled" || p.status === "publishing") todayCounts.scheduled++;
-        else if (p.status === "published") todayCounts.published++;
-        else if (p.status === "failed") todayCounts.failed++;
-      }
-      if (p.status === "scheduled" && dateStr >= todayStr) upcoming.push(p);
-      if (p.status === "published") recent.push(p);
-      if (p.status === "failed") failed.push(p);
+      if (dateStr !== todayStr) continue;
+      if (p.status === "scheduled" || p.status === "publishing") result.scheduled.push(p);
+      else if (p.status === "published") result.published.push(p);
+      else if (p.status === "failed") result.failed.push(p);
     }
 
-    upcoming.sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at));
-    recent.sort((a, b) => (b.published_at ?? "").localeCompare(a.published_at ?? ""));
-
-    return { todayCounts, upcoming: upcoming.slice(0, 8), recent: recent.slice(0, 8), failed };
+    result.scheduled.sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at));
+    result.published.sort((a, b) => (b.published_at ?? "").localeCompare(a.published_at ?? ""));
+    result.failed.sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at));
+    return result;
   }, [posts, todayStr]);
 
   async function retry(id: string) {
@@ -113,90 +112,89 @@ export function DashboardPage() {
         </div>
       </div>
 
-      {/* Status strip: wraps rather than overflowing on a phone. break-words
-          matters because body is a column flex container, so a long unbreakable
-          token here sets the page's min-content width and stretches it. */}
+      {/* One-line status strip. break-words matters because body is a column
+          flex container, so a long unbreakable token here would set the page's
+          min-content width and stretch it. */}
       <div className="mb-6 flex min-w-0 flex-wrap items-center gap-x-6 gap-y-1 break-words rounded-xl border border-gray-200 bg-white p-4 text-sm">
         <span className={`font-semibold ${settings?.enabled ? "text-green-700" : "text-gray-400"}`}>{settings?.enabled ? "✓ Connected" : "○ Disabled"}</span>
         {settings && (
           <span className="text-gray-500">
-            Posts a day: <span className="font-semibold text-brand-dark">{settings.post_times?.length ?? 1}</span> ({settings.post_times?.join(", ") ?? settings.daily_time})
+            <span className="font-semibold text-brand-dark">{settings.postsPerDay}</span> a day at {settings.dailyTime} ({tz})
           </span>
         )}
         {settings?.channel && <span className="text-gray-500">Channel: <span className="font-semibold text-brand-dark">{settings.channel}</span></span>}
       </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <StatCard label="Scheduled" value={todayCounts.scheduled} color="text-gray-600" />
-        <StatCard label="Published" value={todayCounts.published} color="text-green-700" />
-        <StatCard label="Failed" value={todayCounts.failed} color="text-red-600" />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <StatCard bucket="scheduled" count={posts ? buckets.scheduled.length : null} onClick={() => setOpenBucket("scheduled")} />
+        <StatCard bucket="published" count={posts ? buckets.published.length : null} onClick={() => setOpenBucket("published")} />
+        <StatCard bucket="failed" count={posts ? buckets.failed.length : null} onClick={() => setOpenBucket("failed")} />
       </div>
-      <p className="-mt-4 mb-6 text-xs text-gray-400">Today ({todayStr})</p>
+      <p className="-mt-3 mb-6 text-xs text-gray-400">
+        Today ({todayStr}) &mdash; click a card to see the questions behind it.
+      </p>
 
-      <Section title="Upcoming">
-        {!posts ? (
-          <p className="text-sm text-gray-400">Loading…</p>
-        ) : upcoming.length === 0 ? (
-          <p className="text-sm text-gray-400">Nothing scheduled yet — use the Calendar to schedule a question.</p>
-        ) : (
-          upcoming.map((p) => <PostRow key={p.id} post={p} tz={tz} />)
-        )}
-      </Section>
-
-      <Section title="Recently Published">
-        {posts && recent.length === 0 ? <p className="text-sm text-gray-400">Nothing published yet.</p> : recent.map((p) => <PostRow key={p.id} post={p} tz={tz} />)}
-      </Section>
-
-      <Section title="Failed">
-        {posts && failed.length === 0 ? (
-          <p className="text-sm text-gray-400">No failures.</p>
-        ) : (
-          failed.map((p) => (
-            <div key={p.id} className="flex items-center justify-between border-b border-gray-100 py-2.5 text-sm last:border-0">
-              <div className="min-w-0">
-                <p className="truncate font-semibold text-brand-dark">{p.nclex_questions?.category ?? p.nclex_questions?.type ?? "Question"}</p>
-                <p className="truncate text-xs text-red-500">{p.error_message ?? "Telegram API error"}</p>
-              </div>
-              <button type="button" disabled={retrying === p.id} onClick={() => retry(p.id)} className="ml-3 flex-none rounded-lg bg-brand-gold px-3 py-1.5 text-xs font-bold text-brand-dark disabled:opacity-50">
-                {retrying === p.id ? "Retrying…" : "Retry"}
+      {openBucket && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4" role="dialog" aria-modal="true">
+          <div className="mt-10 w-full max-w-xl rounded-2xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-100 p-5">
+              <h2 className="text-lg font-bold text-brand-dark">
+                {BUCKET_TITLE[openBucket]} &middot; {todayStr}
+              </h2>
+              <button type="button" onClick={() => setOpenBucket(null)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">
+                Close
               </button>
             </div>
-          ))
-        )}
-      </Section>
+
+            <div className="max-h-[60vh] overflow-y-auto p-5">
+              {!posts ? (
+                <p className="text-sm text-gray-400">Loading…</p>
+              ) : buckets[openBucket].length === 0 ? (
+                <p className="text-sm text-gray-400">
+                  {openBucket === "failed" ? "Nothing failed today." : openBucket === "published" ? "Nothing published today." : "Nothing scheduled for today."}
+                </p>
+              ) : (
+                <ul className="divide-y divide-gray-100">
+                  {buckets[openBucket].map((p) => (
+                    <li key={p.id} className="flex items-center justify-between gap-3 py-3">
+                      <div className="min-w-0">
+                        <p className="line-clamp-2 text-sm font-semibold text-brand-dark">{p.nclex_questions?.question ?? "(question deleted)"}</p>
+                        <p className="mt-0.5 text-xs text-gray-400">
+                          {utcToZonedTimeStr(new Date(p.scheduled_at), p.timezone)} &middot; #{p.slot_index ?? 0} &middot;{" "}
+                          {p.nclex_questions?.category ?? p.nclex_questions?.type ?? "Question"}
+                        </p>
+                        {openBucket === "failed" && p.error_message && <p className="mt-1 line-clamp-2 text-xs text-red-500">{p.error_message}</p>}
+                      </div>
+                      {openBucket === "failed" ? (
+                        <button
+                          type="button"
+                          disabled={retrying === p.id}
+                          onClick={() => retry(p.id)}
+                          className="flex-none rounded-lg bg-brand-gold px-3 py-1.5 text-xs font-bold text-brand-dark disabled:opacity-50"
+                        >
+                          {retrying === p.id ? "Retrying…" : "Retry"}
+                        </button>
+                      ) : (
+                        <span className={`flex-none rounded-full px-2.5 py-1 text-xs font-bold ${STATUS_BADGE[p.status] ?? "bg-gray-100 text-gray-500"}`}>{p.status}</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
+function StatCard({ bucket, count, onClick }: { bucket: Bucket; count: number | null; onClick: () => void }) {
+  const tone: Record<Bucket, string> = { scheduled: "text-gray-600", published: "text-green-700", failed: "text-red-600" };
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 text-center">
-      <p className={`text-2xl font-bold ${color}`}>{value}</p>
-      <p className="text-xs text-gray-500">{label}</p>
-    </div>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="mb-6">
-      <h2 className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-500">{title}</h2>
-      <div className="rounded-xl border border-gray-200 bg-white px-4 py-1">{children}</div>
-    </div>
-  );
-}
-
-function PostRow({ post, tz }: { post: ScheduledPostWithQuestion; tz: string }) {
-  const d = new Date(post.scheduled_at);
-  return (
-    <div className="flex items-center justify-between border-b border-gray-100 py-2.5 text-sm last:border-0">
-      <div className="min-w-0">
-        <p className="truncate font-semibold text-brand-dark">{post.nclex_questions?.category ?? post.nclex_questions?.type ?? "Question"}</p>
-        <p className="truncate text-xs text-gray-400">
-          {utcToZonedDateStr(d, post.timezone)} {utcToZonedTimeStr(d, post.timezone)} ({tz})
-        </p>
-      </div>
-      <span className={`ml-3 flex-none rounded-full px-2.5 py-1 text-xs font-bold ${STATUS_BADGE[post.status] ?? "bg-gray-100 text-gray-500"}`}>{post.status}</span>
-    </div>
+    <button type="button" onClick={onClick} className="rounded-xl border border-gray-200 bg-white p-4 text-center transition hover:border-brand-teal hover:shadow-sm">
+      <p className={`text-2xl font-bold ${count === 0 ? "text-gray-300" : tone[bucket]}`}>{count ?? "–"}</p>
+      <p className="text-xs text-gray-500">{BUCKET_TITLE[bucket]}</p>
+    </button>
   );
 }

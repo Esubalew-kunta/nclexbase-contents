@@ -82,26 +82,9 @@ export async function POST(request: NextRequest) {
       saved.push(await upsertQuestion(q));
     }
 
-    // New questions are placed onto the Telegram calendar automatically, so
-    // importing a batch is enough — the admin never has to schedule by hand.
-    // Best effort: the question bank is the source of truth here, so a calendar
-    // problem must not fail the import that already succeeded. The response
-    // reports what happened either way.
-    let autoSchedule: unknown = { skipped: "auto-scheduling is off" };
-    try {
-      const { getSchedulingSettings, autoScheduleUnscheduled } = await import("@/lib/supabase/schedule");
-      const { getConfiguredChannel } = await import("@/lib/telegram/client");
-      const channel = getConfiguredChannel();
-      const settings = await getSchedulingSettings();
-      if (channel && settings.autoSchedule && settings.enabled) {
-        autoSchedule = await autoScheduleUnscheduled({ channel });
-      }
-    } catch (e) {
-      console.error("Auto-scheduling after import failed:", e);
-      autoSchedule = { error: errorMessage(e, "Auto-scheduling failed") };
-    }
-
-    return Response.json({ questions: saved, autoSchedule });
+    // Imported questions land in the bank only; the admin places each one onto
+    // the Telegram calendar by hand from there.
+    return Response.json({ questions: saved });
   } catch (err) {
     console.error("POST /api/questions failed:", err);
     return Response.json({ error: errorMessage(err, "Failed to save questions") }, { status: 500 });

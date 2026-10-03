@@ -1,107 +1,103 @@
-/* Bowtie diagram — the NGN "bow-tie" answer shape.
-   Two options on the left (Actions to Take), one in the middle (Condition Most
-   Likely), two on the right (Parameters to Monitor), with elbow connectors
-   drawn between them.
+/* Bow-tie diagram — the fixed NGN shape: two response boxes on the left, one in
+   the middle, two on the right.
 
-   Geometry lives here; colour and type come in as CSS custom properties set by
-   the calling template, so all three templates share one layout instead of
-   maintaining three near-identical copies. */
+   The geometry lives here; colour and type come in as CSS custom properties set
+   by the calling template, so all three templates share one layout instead of
+   maintaining three near-identical copies.
+
+   Every font size here is driven by a `--bt-*` custom property that scales with
+   the slide's density tier, so a long option text shrinks with everything else
+   rather than overflowing its box. */
 
 .root {
-  position: relative;
   width: 100%;
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  column-gap: var(--bt-gutter, 64px);
-  align-items: center;
-}
-
-.links {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  overflow: visible;
-  z-index: 0;
-}
-.link {
-  fill: none;
-  stroke: var(--bt-line, #b9c4c1);
-  stroke-width: 3;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.linkDim {
-  stroke: var(--bt-line-dim, #d6dedb);
-  stroke-dasharray: 8 7;
+  column-gap: var(--bt-gutter, 52px);
+  align-items: start;
 }
 
 .column {
   display: flex;
   flex-direction: column;
-  gap: var(--bt-node-gap, 28px);
-  position: relative;
-  z-index: 1;
+  gap: var(--bt-heading-gap, 14px);
+  min-width: 0;
 }
 
 .heading {
   font-family: var(--bt-font, inherit);
-  font-size: var(--bt-heading-size, 21px);
+  font-size: var(--bt-heading-size, 20px);
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   text-align: center;
   color: var(--bt-heading, #0e5a5c);
-  margin: 0 0 6px;
+  margin: 0;
   line-height: 1.2;
 }
 
-.node {
-  background: var(--bt-chip-bg, rgba(14, 90, 92, 0.06));
-  border: 2px solid var(--bt-chip-border, transparent);
-  border-radius: 16px;
-  padding: var(--bt-node-pad-y, 18px) var(--bt-node-pad-x, 20px);
+.stack {
   display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  min-height: var(--bt-node-min, 76px);
+  flex-direction: column;
+  gap: var(--bt-box-gap, 22px);
 }
 
-.nodeCenter {
+.box {
+  background: var(--bt-chip-bg, rgba(14, 90, 92, 0.06));
+  border: 3px dashed var(--bt-chip-border, #c3cfcd);
+  border-radius: 18px;
+  padding: var(--bt-box-pad, 18px 18px);
+  display: flex;
+  gap: var(--bt-letter-gap, 14px);
+  align-items: flex-start;
+  min-width: 0;
+}
+
+/* On the answer slide every box holds a correct answer, so they all take the
+   solid "filled" treatment. There is no dimmed/incorrect state any more —
+   incorrect options are simply not shown. */
+.boxFilled {
+  background: var(--bt-correct-bg, rgba(201, 163, 78, 0.16));
+  border-color: var(--bt-correct-border, #c9a34e);
+  border-style: solid;
+}
+.boxFilled .letter {
+  background: var(--bt-correct-label-bg, #c9a34e);
+  color: var(--bt-correct-label, #173133);
+}
+.boxFilled .text {
+  color: var(--bt-text, #173133);
+}
+/* The middle box only carries the template's solid accent once it is filled
+   with the correct condition on the answer slide — the single most important
+   answer on the page. On the question slide `.boxCenter` is never applied (see
+   BowtieDiagram.tsx), so the still-blank centre box renders exactly like the
+   other four: a plain dashed `.box` with the striped `.blank` placeholder. */
+.boxFilled.boxCenter {
   background: var(--bt-center-bg, #0e5a5c);
   border-color: var(--bt-center-border, #0e5a5c);
 }
-.nodeCenter .label,
-.nodeCenter .text {
+.boxFilled.boxCenter .letter {
+  background: var(--bt-center-letter-bg, #ffffff);
+  color: var(--bt-center-bg, #0e5a5c);
+}
+.boxFilled.boxCenter .text {
   color: var(--bt-center-text, #ffffff);
 }
 
-.nodeCorrect {
-  background: var(--bt-correct-bg, rgba(201, 163, 78, 0.14));
-  border-color: var(--bt-correct-border, #c9a34e);
-}
-.nodeDim {
-  opacity: 0.42;
-}
-
-.label {
+.letter {
   flex: 0 0 auto;
-  width: var(--bt-label-size, 38px);
-  height: var(--bt-label-size, 38px);
+  width: var(--bt-letter-size, 40px);
+  height: var(--bt-letter-size, 40px);
   border-radius: 50%;
   background: var(--bt-chip-label-bg, #0e5a5c);
   color: var(--bt-chip-label, #ffffff);
   font-family: var(--bt-font, inherit);
-  font-size: var(--bt-label-font, 18px);
+  font-size: var(--bt-letter-font, 20px);
   font-weight: 800;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-.nodeCorrect .label {
-  background: var(--bt-correct-label-bg, #c9a34e);
-  color: var(--bt-correct-label, #173133);
 }
 
 .text {
@@ -109,8 +105,50 @@
   font-size: var(--bt-text-size, 23px);
   line-height: 1.3;
   font-weight: 600;
-  color: var(--bt-text, #173133);
-  padding-top: 3px;
   margin: 0;
-  word-break: break-word;
+  padding-top: 6px;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+/* The full option bank for a column, question slide only — every option, not
+   just the ones that are correct, so the viewer has something to choose from.
+   Plain solid cards rather than the dashed `.box` style: these are candidates
+   to read, not answer slots to fill. */
+.optionList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--bt-option-gap, 10px);
+  margin-top: var(--bt-option-list-gap, 16px);
+}
+
+.optionCard {
+  background: var(--bt-chip-bg, rgba(14, 90, 92, 0.06));
+  border: 2px solid var(--bt-chip-border, #c3cfcd);
+  border-radius: 12px;
+  padding: var(--bt-option-pad, 10px 14px);
+  font-family: var(--bt-font, inherit);
+  font-size: var(--bt-option-text-size, 18px);
+  line-height: 1.3;
+  font-weight: 500;
+  color: var(--bt-text, #173133);
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+/* An empty answer box on the question slide. Drawn rather than collapsed so the
+   question page and the answer page have identical silhouettes. */
+.blank {
+  display: block;
+  flex: 1 1 auto;
+  min-height: var(--bt-blank-min, 42px);
+  border-radius: 8px;
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--bt-blank-line, rgba(14, 90, 92, 0.12)),
+    var(--bt-blank-line, rgba(14, 90, 92, 0.12)) 2px,
+    transparent 2px,
+    transparent 10px
+  );
 }

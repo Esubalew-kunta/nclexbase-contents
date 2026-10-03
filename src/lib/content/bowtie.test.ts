@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { parseQuestionsJson, type ParseResult } from "./normalize";
 import { buildAnswerBlocks, buildQuestionBlocks } from "@/lib/slides/blocks";
+import { buildBowtieDiagram } from "./bowtieModel";
 import type { NormalizedQuestion } from "./types";
 
-/** A realistic NGN bowtie: 2 actions, 2 condition options, 2 parameters — the
- * shape the diagram is built to render. */
+/** A realistic NGN bowtie: 3 options in every section (the fixed authoring
+ * convention — see normalize.ts's "must have exactly 3 options" rule), boxed
+ * down to 2 actions, 1 condition, 2 parameters — the shape the diagram is
+ * built to render. */
 const BOWTIE_JSON = JSON.stringify({
   id: "bt-1",
   type: "bowtie",
@@ -15,6 +18,7 @@ const BOWTIE_JSON = JSON.stringify({
     options: [
       { label: "A", text: "Position in semi-Fowler's and start oxygen at 4 L via nasal cannula" },
       { label: "B", text: "Administer furosemide 40 mg IV push and reassess respiratory status in 30 minutes" },
+      { label: "C", text: "Encourage oral fluids to maintain hydration" },
     ],
     correctAnswer: "B",
   },
@@ -22,6 +26,7 @@ const BOWTIE_JSON = JSON.stringify({
     options: [
       { label: "1", text: "Cardiogenic shock" },
       { label: "2", text: "Pulmonary embolism" },
+      { label: "3", text: "Anaphylactic shock" },
     ],
     correctAnswer: "1",
   },
@@ -29,6 +34,7 @@ const BOWTIE_JSON = JSON.stringify({
     options: [
       { label: "X", text: "Urine output and daily weight" },
       { label: "Y", text: "Cardiac output and blood pressure" },
+      { label: "Z", text: "Serum potassium level" },
     ],
     correctAnswer: "Y",
   },
@@ -65,7 +71,7 @@ describe("bowtie parsing", () => {
 
   it("keeps all three sections with their own correct answers", () => {
     const bowtie = parseOne(BOWTIE_JSON).bowtie!;
-    expect(bowtie.actionsToTake.options).toHaveLength(2);
+    expect(bowtie.actionsToTake.options).toHaveLength(3);
     expect(bowtie.actionsToTake.correctAnswers).toEqual(["B"]);
     expect(bowtie.conditionMostLikely.correctAnswers).toEqual(["1"]);
     expect(bowtie.parametersToMonitor.correctAnswers).toEqual(["Y"]);
@@ -97,10 +103,19 @@ describe("bowtie parsing", () => {
   });
 
   it("accepts several correct answers in a multi-select section", () => {
-    const multi = JSON.parse(BOWTIE_JSON) as { actionsToTake: { options: { label: string; text: string }[]; correctAnswer: string | string[] } };
-    multi.actionsToTake.options.push({ label: "C", text: "Notify the provider of the oliguria" });
+    const multi = JSON.parse(BOWTIE_JSON) as { actionsToTake: { correctAnswer: string | string[] } };
     multi.actionsToTake.correctAnswer = ["B", "C"];
     expect(parseOne(JSON.stringify(multi)).bowtie!.actionsToTake.correctAnswers).toEqual(["B", "C"]);
+  });
+
+  it("requires exactly 3 options per section, since the question slide now lists every one of them", () => {
+    const tooMany = JSON.parse(BOWTIE_JSON) as { actionsToTake: { options: { label: string; text: string }[] } };
+    tooMany.actionsToTake.options.push({ label: "D", text: "Notify the provider of the oliguria" });
+    expect(parseWithIssues(JSON.stringify(tooMany)).some((m) => /"actionsToTake" must have exactly 3 options, got 4/.test(m))).toBe(true);
+
+    const tooFew = JSON.parse(BOWTIE_JSON) as { parametersToMonitor: { options: { label: string; text: string }[] } };
+    tooFew.parametersToMonitor.options.pop();
+    expect(parseWithIssues(JSON.stringify(tooFew)).some((m) => /"parametersToMonitor" must have exactly 3 options, got 2/.test(m))).toBe(true);
   });
 
   it("never puts bowtie options in the flat options list", () => {
@@ -111,8 +126,8 @@ describe("bowtie parsing", () => {
 describe("bowtie slide blocks", () => {
   it("emits the diagram as ONE atomic block, never one block per option", () => {
     const blocks = buildQuestionBlocks(parseOne(BOWTIE_JSON));
-    // Scenario text + diagram, and nothing else. Splitting the three columns
-    // across slides would break the connector lines.
+    // Scenario text + diagram, and nothing else. Splitting the diagram across
+    // slides would break it into unrelated boxes.
     expect(blocks).toHaveLength(2);
     expect(blocks.filter((b) => b.kind === "bowtie-diagram")).toHaveLength(1);
   });
@@ -139,5 +154,118 @@ describe("bowtie slide blocks", () => {
 
   it("omits the CTA entirely when the text is empty", () => {
     expect(buildAnswerBlocks(parseOne(BOWTIE_JSON), "   ").some((b) => b.kind === "cta")).toBe(false);
+  });
+});
+
+describe("bowtie diagram shape", () => {
+  const bowtie = () => parseOne(BOWTIE_JSON).bowtie!;
+
+  it("is always 2 boxes left, 1 centre, 2 right on the question slide", () => {
+    // Fixed by the format, not by the data: the sample bowtie offers three
+    // options in the middle group but that still gets exactly one box.
+    const model = buildBowtieDiagram(bowtie(), "question");
+    expect(model.columns.map((c) => c.boxes.length)).toEqual([2, 1, 2]);
+  });
+
+  it("uses the three NGN headings in left, centre, right order", () => {
+    const model = buildBowtieDiagram(bowtie(), "answer");
+    expect(model.columns.map((c) => c.title)).toEqual(["Actions to Take", "Condition Most Likely", "Parameters to Monitor"]);
+  });
+
+  it("marks only the centre column as the centre", () => {
+    const model = buildBowtieDiagram(bowtie(), "answer");
+    expect(model.columns.map((c) => c.isCenter)).toEqual([false, true, false]);
+  });
+
+  it("labels the question slide's boxes A-E positionally, left column first", () => {
+    // The source JSON labels its sections A/B/C, 1/2/3 and X/Y/Z, which are
+    // three separate sequences and don't form one readable run.
+    const model = buildBowtieDiagram(bowtie(), "question");
+    expect(model.columns.flatMap((c) => c.boxes.map((b) => b.letter))).toEqual(["A", "B", "C", "D", "E"]);
+  });
+
+  it("uses the same letters for the same positions on both slides", () => {
+    // Box "A" on the question page must be the box filled in on the answer page,
+    // which only works because the letters come from the column position and not
+    // from a counter that advances differently on each slide.
+    const question = buildBowtieDiagram(bowtie(), "question");
+    const answer = buildBowtieDiagram(bowtie(), "answer");
+    for (const [i, col] of question.columns.entries()) {
+      expect(answer.columns[i].boxes.map((b) => b.letter)).toEqual(col.boxes.slice(0, answer.columns[i].boxes.length).map((b) => b.letter));
+    }
+  });
+
+  it("leaves every box empty on the question slide", () => {
+    const model = buildBowtieDiagram(bowtie(), "question");
+    expect(model.columns.flatMap((c) => c.boxes.map((b) => b.text))).toEqual([null, null, null, null, null]);
+  });
+
+  it("shows one filled box per correct answer on the answer slide", () => {
+    // This bowtie has one correct answer per section, so the answer page is 1-1-1
+    // — a blank box there would read as a mistake rather than as "not this one".
+    const model = buildBowtieDiagram(bowtie(), "answer");
+    expect(model.columns.map((c) => c.boxes.length)).toEqual([1, 1, 1]);
+    expect(model.columns.map((c) => c.boxes[0].text)).toEqual([
+      "Administer furosemide 40 mg IV push and reassess respiratory status in 30 minutes",
+      "Cardiogenic shock",
+      "Cardiac output and blood pressure",
+    ]);
+  });
+
+  it("never leaves an answer box blank", () => {
+    const model = buildBowtieDiagram(bowtie(), "answer");
+    expect(model.columns.flatMap((c) => c.boxes.map((b) => b.text))).not.toContain(null);
+  });
+
+  it("shows two filled boxes when a section has two correct answers", () => {
+    const multi = JSON.parse(BOWTIE_JSON) as { parametersToMonitor: { correctAnswer: string | string[] } };
+    multi.parametersToMonitor.correctAnswer = ["X", "Y"];
+    const model = buildBowtieDiagram(parseOne(JSON.stringify(multi)).bowtie!, "answer");
+    expect(model.columns[2].boxes).toHaveLength(2);
+    // Right column starts at D: left takes A-B, the centre takes C.
+    expect(model.columns[2].boxes.map((b) => b.letter)).toEqual(["D", "E"]);
+  });
+
+  it("never shows an incorrect option on the answer slide", () => {
+    const model = buildBowtieDiagram(bowtie(), "answer");
+    const shown = model.columns.flatMap((c) => c.boxes.map((b) => b.text)).filter(Boolean);
+    expect(shown.join(" ")).not.toContain("semi-Fowler");
+    expect(shown.join(" ")).not.toContain("Pulmonary embolism");
+    expect(shown.join(" ")).not.toContain("daily weight");
+  });
+
+  it("flags a section that offers more options than the format's box count", () => {
+    // normalize.ts now rejects more-or-fewer-than-3 at the JSON layer (see the
+    // "requires exactly 3 options" test above), but the model itself stays
+    // defensive about box count regardless of how many options reach it — so
+    // this builds the overfull section by hand rather than through the parser.
+    // Never silently narrow the options a learner is choosing between.
+    const overfull = bowtie();
+    overfull.actionsToTake.options.push({ label: "D", text: "Notify the provider of the oliguria" });
+    expect(buildBowtieDiagram(overfull, "question").extended).toBe(true);
+  });
+
+  it("keeps the fixed box count even when a section overflows it", () => {
+    const overfull = bowtie();
+    overfull.actionsToTake.options.push({ label: "D", text: "Notify the provider of the oliguria" });
+    overfull.actionsToTake.correctAnswers = ["B", "D"];
+
+    const question = buildBowtieDiagram(overfull, "question");
+    expect(question.columns.map((c) => c.boxes.length)).toEqual([2, 1, 2]);
+
+    // Two correct actions, so the answer slide grows to two filled boxes — the
+    // shape stays correct rather than dropping the second answer.
+    const answer = buildBowtieDiagram(overfull, "answer");
+    expect(answer.columns[0].boxes.map((b) => b.letter)).toEqual(["A", "B"]);
+  });
+
+  it("keeps a box on the answer slide when a section has no parsable answer", () => {
+    // The parser rejects this, so build the section by hand to prove the model
+    // degrades safely on data that slipped through.
+    const b = bowtie();
+    b.conditionMostLikely.correctAnswers = [];
+    const model = buildBowtieDiagram(b, "answer");
+    expect(model.columns[1].boxes).toHaveLength(1);
+    expect(model.columns[1].boxes[0].text).toBeNull();
   });
 });

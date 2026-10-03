@@ -24,9 +24,9 @@ export async function GET(request: NextRequest) {
     const assignedIds = new Set(assignments.map((a) => a.questionId));
 
     return Response.json({
-      postTimes: settings.postTimes,
+      dailyTime: settings.dailyTime,
+      postsPerDay: settings.postsPerDay,
       timezone: settings.timezone,
-      autoSchedule: settings.autoSchedule,
       enabled: settings.enabled,
       assignments,
       unassigned: eligible

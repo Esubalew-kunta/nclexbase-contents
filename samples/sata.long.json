@@ -1,0 +1,22 @@
+{
+  "id": "sata-long-01",
+  "type": "sata",
+  "question": "A nurse is caring for a 72-year-old client admitted with a new diagnosis of heart failure with reduced ejection fraction after presenting to the emergency department with a three-day history of worsening shortness of breath, a 4.5 kg (10 lb) weight gain, bilateral lower extremity edema to the knees, and the need to sleep propped up on three pillows. The client's current medications include a loop diuretic, an ACE inhibitor, and a beta-blocker, and the nurse is providing discharge teaching before the client goes home later today. Which client statements indicate that the teaching has been effective?",
+  "options": [
+    { "label": "A", "text": "I will weigh myself every morning, after voiding and before eating, and record it." },
+    { "label": "B", "text": "I'll call my provider if I gain more than 2 to 3 pounds in a day or 5 pounds in a week." },
+    { "label": "C", "text": "I can stop my water pill once my ankles stop swelling." },
+    { "label": "D", "text": "I should limit my sodium intake and check food labels for hidden salt." },
+    { "label": "E", "text": "I'll keep taking an over-the-counter pain reliever for my joint pain every day." },
+    { "label": "F", "text": "I will sleep with my head and chest propped up if I get short of breath." },
+    { "label": "G", "text": "It's fine to skip my beta-blocker on days I feel like my heart is beating slowly." }
+  ],
+  "correctAnswer": ["A", "B", "D", "F"],
+  "optionRationales": {
+    "C": "The diuretic prevents fluid from reaccumulating; stopping it once swelling resolves lets fluid build back up and often triggers readmission within days.",
+    "E": "Routine use of an over-the-counter NSAID-type pain reliever causes sodium and fluid retention and can blunt the diuretic's effect, both of which worsen heart failure.",
+    "G": "Beta-blockers must be tapered, never stopped abruptly, and skipping doses based on how the heart feels risks rebound tachycardia and decompensation; any concern about a slow heart rate belongs to the provider, not a skipped dose."
+  },
+  "explanation": "Daily weights, a clear threshold for calling the provider, sodium restriction, and elevating the head and chest during dyspnea are all core heart-failure self-management skills that catch fluid overload early, before it requires readmission. Diuretics must be continued even when swelling improves, routine pain-reliever use can worsen heart failure and blunt the diuretic's effect, and a beta-blocker should never be stopped abruptly or skipped without provider guidance, since doing so risks rebound tachycardia and decompensation.",
+  "keyPoint": "A daily weight plus a clear call-the-provider threshold is the single most protective habit for a heart failure client at home."
+}

@@ -142,14 +142,14 @@ export function AnswerBlockView({ block }: { block: AnswerBlock }) {
   }
 }
 
-export function QuestionFrame({ question, blocks, isContinuation, overallIndex, overallTotal, scale }: SlideFrameProps<QuestionBlock>) {
+export function QuestionFrame({ question, blocks, isContinuation, overallIndex, overallTotal, scale, densityTier }: SlideFrameProps<QuestionBlock>) {
   return (
     <div className={styles.canvas}>
       <Header question={question} />
       {isContinuation ? <span className={styles.contLabel}>{QUESTION_LABEL} (CONTINUED)</span> : <span className={styles.qlabel}>{QUESTION_LABEL}</span>}
       {!isContinuation && question.instructions && <p className={styles.instructions}>{question.instructions}</p>}
       <div className={styles.body}>
-        <SlideContent scale={scale} className={styles.content}>
+        <SlideContent scale={scale} densityTier={densityTier} className={styles.content}>
           {blocks.map((b) => (
             <QuestionBlockView key={b.id} block={b} />
           ))}
@@ -175,13 +175,13 @@ const ANSWER_HEADINGS: Record<string, string> = {
   bowtie: "ANSWER KEY",
 };
 
-export function AnswerFrame({ question, blocks, isContinuation, overallIndex, overallTotal, scale }: SlideFrameProps<AnswerBlock>) {
+export function AnswerFrame({ question, blocks, isContinuation, overallIndex, overallTotal, scale, densityTier }: SlideFrameProps<AnswerBlock>) {
   return (
     <div className={styles.canvas}>
       <Header question={question} />
       <span className={styles.qlabel}>{isContinuation ? "ANSWER (CONTINUED)" : (ANSWER_HEADINGS[question.format] ?? "CORRECT ANSWER")}</span>
       <div className={styles.body}>
-        <SlideContent scale={scale} className={styles.content}>
+        <SlideContent scale={scale} densityTier={densityTier} className={styles.content}>
           {blocks.map((b) => (
             <AnswerBlockView key={b.id} block={b} />
           ))}

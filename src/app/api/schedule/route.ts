@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { createScheduledPost, listScheduledPosts } from "@/lib/supabase/schedule";
+import { createScheduledPost, getSchedulingSettings, listScheduledPosts } from "@/lib/supabase/schedule";
 import { rowToNormalizedQuestion, upsertQuestion } from "@/lib/supabase/questions";
 import { buildTelegramSnapshot } from "@/lib/telegram/snapshot";
 import { getConfiguredChannel } from "@/lib/telegram/client";
@@ -24,22 +24,59 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as {
-      question: NormalizedQuestion;
+      action?: "place";
+      question?: NormalizedQuestion;
+      /** The bank question to place, when the caller already knows its id. */
       contentId?: string;
-      dateStr: string;
-      timeStr: string;
-      timezone: string;
+      dateStr?: string;
+      timeStr?: string;
+      timezone?: string;
       replaceConflict?: boolean;
     };
 
     const channel = getConfiguredChannel();
     if (!channel) return Response.json({ error: "Telegram channel is not configured" }, { status: 400 });
 
+    // `contentId` is what the calendar's day panel sends: it has already chosen
+    // the question and only needs the server to build the payload. Re-reading
+    // and re-deriving it here (rather than trusting a snapshot from the browser)
+    // keeps the frozen payload on exactly one code path.
+    if (body.action === "place") {
+      if (!body.contentId || !body.dateStr || !body.timezone) {
+        return Response.json({ error: "contentId, dateStr and timezone are required to place a question" }, { status: 400 });
+      }
+      const { getQuestionById } = await import("@/lib/supabase/questions");
+      const row = await getQuestionById(body.contentId);
+      if (!row) return Response.json({ error: "Question not found" }, { status: 404 });
+
+      let snapshot;
+      try {
+        snapshot = buildTelegramSnapshot(rowToNormalizedQuestion(row));
+      } catch (err) {
+        return Response.json({ error: err instanceof Error ? err.message : "That question cannot be posted to Telegram" }, { status: 400 });
+      }
+
+      const result = await createScheduledPost({
+        contentId: body.contentId,
+        snapshot,
+        channel,
+        dateStr: body.dateStr,
+        timeStr: body.timeStr ?? (await getSchedulingSettings()).dailyTime,
+        timezone: body.timezone,
+        replaceConflict: body.replaceConflict,
+      });
+      if (result.conflict) {
+        return Response.json({ conflict: true, existing: result.existing, error: "That day already has its full set of posts" }, { status: 409 });
+      }
+      return Response.json({ post: result.post });
+    }
+
     // Accept either an already-normalized question or the raw import shape, and
     // normalize the latter here. Without this, posting raw JSON reaches
     // upsertQuestion missing `format` and fails as an opaque NOT NULL 500
     // rather than something the caller can act on.
     let question = body.question as NormalizedQuestion;
+    if (!question) return Response.json({ error: "A question is required" }, { status: 400 });
     if (question.format === undefined) {
       const { result, parseError } = parseQuestionsJson(JSON.stringify(body.question));
       if (parseError) return Response.json({ error: parseError }, { status: 400 });
@@ -50,6 +87,10 @@ export async function POST(request: NextRequest) {
         );
       }
       question = result.questions[0];
+    }
+
+    if (!body.dateStr || !body.timezone) {
+      return Response.json({ error: "dateStr and timezone are required to schedule" }, { status: 400 });
     }
 
     let contentId = body.contentId;
@@ -66,7 +107,7 @@ export async function POST(request: NextRequest) {
       snapshot,
       channel,
       dateStr: body.dateStr,
-      timeStr: body.timeStr,
+      timeStr: body.timeStr ?? (await getSchedulingSettings()).dailyTime,
       timezone: body.timezone,
       replaceConflict: body.replaceConflict,
     });

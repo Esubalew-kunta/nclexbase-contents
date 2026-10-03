@@ -1,0 +1,31 @@
+{
+  "id": "bowtie-long-02",
+  "type": "bowtie",
+  "question": "A 58-year-old client is admitted to the medical unit three days after a total knee replacement with a two-day history of fever, chills, and increasing confusion. The family reports the client has been less responsive since this morning and has not urinated much since last night. On assessment the nurse finds the client lethargic and oriented to person only, with skin that is warm and flushed. Vital signs are temperature 39.4 degrees C (102.9 degrees F), heart rate 128/min, respiratory rate 28/min, blood pressure 78/42 mmHg, and oxygen saturation 91% on room air. The surgical incision on the right knee is red, warm, and draining purulent fluid. Laboratory results show a white blood cell count of 22,000/mm3, serum lactate of 4.8 mmol/L, and a blood glucose of 168 mg/dL. Blood cultures have been obtained and are pending.",
+  "actionsToTake": {
+    "options": [
+      { "label": "A", "text": "Initiate broad-spectrum intravenous antibiotics within the first hour" },
+      { "label": "B", "text": "Begin rapid intravenous crystalloid fluid resuscitation" },
+      { "label": "C", "text": "Administer an antipyretic and wait to reassess in four hours before further action" }
+    ],
+    "correctAnswer": ["A", "B"]
+  },
+  "conditionMostLikely": {
+    "options": [
+      { "label": "1", "text": "Septic shock" },
+      { "label": "2", "text": "Hypovolemic shock" },
+      { "label": "3", "text": "Cardiogenic shock" }
+    ],
+    "correctAnswer": "1"
+  },
+  "parametersToMonitor": {
+    "options": [
+      { "label": "X", "text": "Serum lactate trend" },
+      { "label": "Y", "text": "Urine output hourly" },
+      { "label": "Z", "text": "Blood glucose every 6 hours" }
+    ],
+    "correctAnswer": ["X", "Y"]
+  },
+  "explanation": "Fever, marked tachycardia, tachypnea, hypotension, altered mental status, and an infected surgical wound with a markedly elevated white blood cell count and lactate together point to septic shock arising from a surgical site infection. The Surviving Sepsis Campaign bundle calls for broad-spectrum antibiotics and aggressive fluid resuscitation within the first hour of recognition, because every hour antibiotics are delayed in septic shock measurably increases mortality. Ongoing perfusion is tracked with serial lactate levels, which should trend downward as resuscitation succeeds, and with hourly urine output, since the kidneys are one of the first organs to show the effects of poor perfusion.",
+  "keyPoint": "In septic shock, antibiotics and fluids within the first hour save lives, and a falling lactate with rising urine output is the earliest sign resuscitation is working."
+}
