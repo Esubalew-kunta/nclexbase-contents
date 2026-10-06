@@ -2,19 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { downloadBlob } from "@/lib/download";
 import type { NormalizedQuestion } from "@/lib/content/types";
 import type { TemplateId } from "@/lib/slides/types";
-
-async function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
 
 export function ExportPanel({ questions, templateId, ctaText }: { questions: NormalizedQuestion[]; templateId: TemplateId; ctaText: string }) {
   const [status, setStatus] = useState<string | null>(null);
@@ -49,7 +39,7 @@ export function ExportPanel({ questions, templateId, ctaText }: { questions: Nor
       }
 
       const blob = await res.blob();
-      await downloadBlob(blob, "NCLEXBase_Questions.zip");
+      downloadBlob(blob, "NCLEXBase_Questions.zip");
       setStatus(`Downloaded NCLEXBase_Questions.zip (${questions.length} question${questions.length === 1 ? "" : "s"}).`);
     } catch (err) {
       setStatus(err instanceof Error ? err.message : "Export failed");

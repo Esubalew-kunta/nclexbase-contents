@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CATEGORY_LABELS, type NormalizedQuestion } from "@/lib/content/types";
 import { BANK_FORMAT_LABELS, type BankFormat } from "@/lib/supabase/questions";
+import { downloadBlob } from "@/lib/download";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EditQuestionModal } from "./EditQuestionModal";
 import type { BankQuestion, BankFilter } from "./types";
@@ -192,16 +193,12 @@ export function QuestionBankPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ questions: [toNormalized(question)], templateId: question.template_id ?? "modern-study" }),
       });
-      if (!res.ok) throw new Error(`Download failed (${res.status})`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error ?? `Download failed (${res.status})`);
+      }
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `question-${question.external_id ?? question.id.slice(0, 8)}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, `question-${question.external_id ?? question.id.slice(0, 8)}.zip`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Download failed");
     } finally {

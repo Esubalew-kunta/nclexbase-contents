@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { downloadBlob } from "@/lib/download";
 import type { NormalizedQuestion } from "@/lib/content/types";
 import { useSlidePlan } from "@/lib/slides/useSlidePlan";
 import { ScaledSlide } from "@/components/slides/ScaledSlide";
@@ -51,14 +52,7 @@ function DownloadSlideButton({ question, templateId, slideIndex, ctaText }: { qu
             const match = disposition.match(/filename="([^"]+)"/);
             const filename = match ? match[1] : `question-${question.index}-slide-${slideIndex + 1}.png`;
             const blob = await res.blob();
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            URL.revokeObjectURL(url);
+            downloadBlob(blob, filename);
           } catch (err) {
             setError(err instanceof Error ? err.message : "Download failed");
           } finally {
