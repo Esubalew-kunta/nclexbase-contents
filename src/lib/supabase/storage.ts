@@ -37,18 +37,20 @@ export async function uploadQuestionSlides(questionId: string, files: SlideToSto
   // slides to two would still show four thumbnails (two of them stale).
   await removeQuestionSlidesByPrefix(questionId);
 
-  const uploaded: string[] = [];
-  for (const file of files) {
-    const path = slideObjectPath(questionId, file.filename);
-    const { error } = await db.storage.from(BUCKET).upload(path, file.buffer, {
-      contentType: "image/png",
-      cacheControl: "31536000",
-      upsert: true,
-    });
-    if (error) throw new Error(`Failed to upload ${path}: ${error.message}`);
-    uploaded.push(path);
-  }
-  return uploaded;
+  // Uploaded in parallel: each round trip to Supabase is the slow part, so doing
+  // them one after another made a four-slide question wait four times as long.
+  return Promise.all(
+    files.map(async (file) => {
+      const path = slideObjectPath(questionId, file.filename);
+      const { error } = await db.storage.from(BUCKET).upload(path, file.buffer, {
+        contentType: "image/png",
+        cacheControl: "31536000",
+        upsert: true,
+      });
+      if (error) throw new Error(`Failed to upload ${path}: ${error.message}`);
+      return path;
+    }),
+  );
 }
 
 /** Removes every stored slide for a question. Tolerates a bucket that was

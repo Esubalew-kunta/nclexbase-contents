@@ -38,14 +38,10 @@ function DownloadSlideButton({ question, templateId, slideIndex, ctaText }: { qu
               throw new Error(body?.error ?? `Download failed (${res.status})`);
             }
 
-            // Generating an image also files the question away in the bank, so
-            // say so rather than leaving the user to wonder whether it stuck.
-            const bankId = res.headers.get("X-Bank-Question-Id");
-            const bankCount = res.headers.get("X-Bank-Slide-Count");
-            if (res.headers.get("X-Bank-Saved") === "true" && bankId) {
-              setSaved({ count: Number(bankCount ?? 1), questionId: bankId });
-            } else {
-              setSaveWarning(res.headers.get("X-Bank-Error") ?? "The image downloaded, but could not be saved to the question bank.");
+            // Generating an image also files the question away in the bank, but
+            // that happens after the download so the user isn't kept waiting.
+            if (res.headers.get("X-Bank-Saved") === "pending") {
+              setSaved({ count: 0, questionId: "" });
             }
 
             const disposition = res.headers.get("Content-Disposition") ?? "";
@@ -66,7 +62,7 @@ function DownloadSlideButton({ question, templateId, slideIndex, ctaText }: { qu
       {error && <p className="max-w-xs text-center text-xs text-red-400">{error}</p>}
       {saved && (
         <p className="max-w-xs text-center text-xs text-green-700">
-          Saved to the question bank with all {saved.count} image{saved.count > 1 ? "s" : ""}.{" "}
+          Saving to the question bank in the background.{" "}
           <Link href="/questions" className="underline">
             View
           </Link>

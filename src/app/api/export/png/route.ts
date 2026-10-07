@@ -1,4 +1,4 @@
-import type { NextRequest } from "next/server";
+import { after, type NextRequest } from "next/server";
 import { renderQuestionSlides } from "@/lib/export/render";
 import { saveRenderedQuestionToBank } from "@/lib/export/slideBank";
 import type { NormalizedQuestion } from "@/lib/content/types";
@@ -27,16 +27,18 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: "slideIndex out of range" }, { status: 400 });
     }
 
-    const saved = await saveRenderedQuestionToBank(question, slides, templateId);
+    // Filing the question in the bank means a DB write plus several storage
+    // uploads. The user already has their image at this point, so do it after
+    // the response instead of making them wait for it; a failure is logged by
+    // saveRenderedQuestionToBank and shows up as a missing bank entry.
+    after(() => saveRenderedQuestionToBank(question, slides, templateId));
 
     return new Response(new Uint8Array(slide.buffer), {
       status: 200,
       headers: {
         "Content-Type": "image/png",
         "Content-Disposition": `attachment; filename="${slide.filename}"`,
-        "X-Bank-Saved": "error" in saved ? "failed" : "true",
-        ...("questionId" in saved ? { "X-Bank-Question-Id": saved.questionId, "X-Bank-Slide-Count": String(saved.slideCount) } : {}),
-        ...("error" in saved ? { "X-Bank-Error": saved.error } : {}),
+        "X-Bank-Saved": "pending",
       },
     });
   } catch (err) {

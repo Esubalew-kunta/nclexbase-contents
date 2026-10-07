@@ -29,16 +29,24 @@ export async function POST(request: NextRequest) {
   let savedCount = 0;
   const saveFailures: string[] = [];
 
+  // Bank saves are started as soon as a question has rendered and run alongside
+  // the next question's render; all of them are awaited before the response.
+  const saves: Promise<void>[] = [];
+
   try {
     for (const question of questions) {
       const slides = await renderQuestionSlides(question, templateId, ctaText, request.nextUrl.origin);
       slides.forEach((slide) => {
         zip.file(slide.filename, slide.buffer);
       });
-      const saved = await saveRenderedQuestionToBank(question, slides, templateId);
-      if ("error" in saved) saveFailures.push(`${question.index}: ${saved.error}`);
-      else savedCount++;
+      saves.push(
+        saveRenderedQuestionToBank(question, slides, templateId).then((saved) => {
+          if ("error" in saved) saveFailures.push(`${question.index}: ${saved.error}`);
+          else savedCount++;
+        }),
+      );
     }
+    await Promise.all(saves);
   } catch (err) {
     console.error("ZIP export failed:", err);
     return Response.json({ error: err instanceof Error ? err.message : "Render failed" }, { status: 500 });
