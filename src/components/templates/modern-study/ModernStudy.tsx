@@ -18,8 +18,8 @@ export const meta: TemplateMeta = {
 };
 
 export const budgets = {
-  question: 1450,
-  answer: 1550,
+  question: 1350,
+  answer: 1450,
   bodyWidth: 936,
   gap: 0,
 };
@@ -141,9 +141,9 @@ function Band({ question, title, isContinuation, contLabel }: { question: { cate
 
 export function QuestionFrame({ question, blocks, isContinuation, overallIndex, overallTotal, scale, densityTier }: SlideFrameProps<QuestionBlock>) {
   return (
-    <div className={styles.canvas}>
+    <div className={`${styles.canvas} ${styles.canvasTealBottom}`}>
       <Band question={question} title={QUESTION_LABEL} isContinuation={isContinuation} contLabel={`${QUESTION_LABEL} — Continued`} />
-      <div className={styles.body}>
+      <div className={`${styles.body} ${styles.bodyCard}`}>
         {!isContinuation && question.instructions && <p className={styles.instructions}>{question.instructions}</p>}
         <SlideContent scale={scale} densityTier={densityTier} className={styles.content}>
           {blocks.map((b) => (
@@ -162,9 +162,9 @@ export function QuestionFrame({ question, blocks, isContinuation, overallIndex, 
 
 export function AnswerFrame({ question, blocks, isContinuation, overallIndex, overallTotal, scale, densityTier }: SlideFrameProps<AnswerBlock>) {
   return (
-    <div className={styles.canvas}>
+    <div className={`${styles.canvas} ${styles.canvasTealBottom}`}>
       <Band question={{ category: "ANSWER REVEAL" }} title="" isContinuation={isContinuation} contLabel="ANSWER — CONTINUED" />
-      <div className={styles.body}>
+      <div className={`${styles.body} ${styles.bodyCard}`}>
         <SlideContent scale={scale} densityTier={densityTier} className={styles.content}>
           {blocks.map((b) => (
             <AnswerBlockView key={b.id} block={b} />

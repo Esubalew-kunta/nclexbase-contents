@@ -73,6 +73,16 @@
   display: flex;
   flex-direction: column;
 }
+/* Fixed teal strip (header colour) under the white card on every slide. */
+.canvasTealBottom {
+  background: #0e5a5c;
+  padding-bottom: 120px;
+}
+.bodyCard {
+  background: #ffffff;
+  padding-bottom: 24px;
+  border-bottom: 5px solid #c9a34e;
+}
 .instructions {
   font-size: calc(26px * var(--density-scale, 1));
   font-weight: 700;
