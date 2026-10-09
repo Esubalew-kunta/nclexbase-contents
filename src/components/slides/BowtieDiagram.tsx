@@ -5,7 +5,8 @@ import type { NormalizedBowtie } from "@/lib/content/types";
 import { buildBowtieDiagram } from "@/lib/content/bowtieModel";
 import styles from "./BowtieDiagram.module.css";
 
-/** Renders an NGN bow-tie as the fixed 2 - 1 - 2 arrangement of response boxes,
+/** Renders an NGN bow-tie as three columns of response boxes (one box per correct
+ *  answer in each, so 2-1-2, 3-2-3, 2-2-2 ... all work),
  *  with the full option bank for each column listed underneath on the question
  *  slide — the viewer has no drag-and-drop UI to pick from, so the candidates
  *  have to be on the image itself, directly under the column they belong to.

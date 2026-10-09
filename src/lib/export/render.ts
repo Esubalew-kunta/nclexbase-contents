@@ -1,5 +1,7 @@
 import { getBrowser } from "./browser";
-import { putPrintPayload, deletePrintPayload } from "./tokenStore";
+import { putPrintPayload, deletePrintPayload, type PrintPayload } from "./tokenStore";
+import type { Page } from "playwright";
+import { putPrintImage, deletePrintImage } from "./imageStore";
 import type { NormalizedQuestion } from "@/lib/content/types";
 import type { TemplateId } from "@/lib/slides/types";
 
@@ -37,17 +39,35 @@ function localOrigin(requestOrigin: string): string {
   return requestOrigin.replace("//0.0.0.0", "//127.0.0.1");
 }
 
-/** Renders every slide for one question through the real /print page (the
- *  exact same React templates + pagination the live preview uses) and
- *  screenshots each slide element at its true 1080x1920 size. Retries once on
- *  a crashed browser/page (e.g. after the dev server itself restarted and
+/** Attached pictures are data: URLs, far too big for the URL-carried print
+ *  token. Park each one server-side and point the question at it instead. */
+async function withParkedImages<T>(question: NormalizedQuestion, run: (question: NormalizedQuestion) => Promise<T>): Promise<T> {
+  const imageIds: string[] = [];
+  const park = (image: NormalizedQuestion["image"]): NormalizedQuestion["image"] => {
+    if (!image?.src.startsWith("data:")) return image;
+    const id = putPrintImage(image.src);
+    if (!id) return null;
+    imageIds.push(id);
+    return { ...image, src: `/api/print-image/${id}` };
+  };
+  try {
+    return await run({ ...question, image: park(question.image), answerImage: park(question.answerImage) });
+  } finally {
+    for (const id of imageIds) deletePrintImage(id);
+  }
+}
+
+/** Opens the real /print page (the exact same React templates + pagination the
+ *  live preview uses) for one question, waits until it is laid out and its
+ *  pictures have painted, and hands the page to `capture`. Retries once on a
+ *  crashed browser/page (e.g. after the dev server itself restarted and
  *  orphaned the old Chromium process). */
-export async function renderQuestionSlides(question: NormalizedQuestion, templateId: TemplateId, ctaText: string, requestOrigin: string): Promise<RenderedSlide[]> {
+async function withPrintPage<T>(payload: PrintPayload, requestOrigin: string, capture: (page: Page) => Promise<T>): Promise<T> {
   const origin = localOrigin(requestOrigin);
   let attempt = 0;
   for (;;) {
     attempt++;
-    const token = putPrintPayload({ question, templateId, ctaText });
+    const token = putPrintPayload(payload);
     try {
       const browser = await getBrowser();
       const page = await browser.newPage({ viewport: { width: 1200, height: 1200 } });
@@ -61,19 +81,11 @@ export async function renderQuestionSlides(question: NormalizedQuestion, templat
         const overflow = await page.evaluate(() => window.__OVERFLOW__ ?? []);
         if (overflow.length > 0) throw new SlideOverflowError(overflow);
 
-        const kinds = await page.evaluate(() => window.__SLIDE_KINDS__ ?? []);
-        const counts: Record<string, number> = {};
-        const slides: RenderedSlide[] = [];
-        for (let i = 0; i < kinds.length; i++) {
-          const buffer = await page.locator(`[data-slide-index="${i}"]`).screenshot({ type: "png" });
-          const { kind, isContinuation } = kinds[i];
-          const prefix = kind === "question" ? "Q" : "A";
-          counts[kind] = (counts[kind] ?? 0) + 1;
-          const occurrence = counts[kind];
-          const filename = `${prefix}${question.index}${occurrence > 1 ? `-${occurrence}` : ""}.png`;
-          slides.push({ buffer, kind, isContinuation, filename });
-        }
-        return slides;
+        // Layout never waits on pictures (their height comes from CSS), so make
+        // sure they have actually painted before the screenshots are taken.
+        await page.evaluate(() => Promise.all(Array.from(document.images).map((img) => (img.complete ? null : new Promise((r) => { img.onload = img.onerror = r; })))));
+
+        return await capture(page);
       } finally {
         await page.close();
       }
@@ -82,11 +94,52 @@ export async function renderQuestionSlides(question: NormalizedQuestion, templat
       if (err instanceof SlideOverflowError) throw err;
       const message = err instanceof Error ? err.message : String(err);
       if (attempt < 2 && /crash|closed|disconnected/i.test(message)) {
-        continue; // the shared browser died mid-render — getBrowser() will relaunch it
+        continue; // the shared browser died mid-render, so getBrowser() will relaunch it
       }
       throw err;
     } finally {
       deletePrintPayload(token);
     }
   }
+}
+
+/** Renders every slide for one question and screenshots each slide element at
+ *  its true 1080x1920 size. */
+export async function renderQuestionSlides(question: NormalizedQuestion, templateId: TemplateId, ctaText: string, requestOrigin: string): Promise<RenderedSlide[]> {
+  return withParkedImages(question, (q) =>
+    withPrintPage({ question: q, templateId, ctaText }, requestOrigin, async (page) => {
+      const kinds = await page.evaluate(() => window.__SLIDE_KINDS__ ?? []);
+      const counts: Record<string, number> = {};
+      const slides: RenderedSlide[] = [];
+      for (let i = 0; i < kinds.length; i++) {
+        const buffer = await page.locator(`[data-slide-index="${i}"]`).screenshot({ type: "png" });
+        const { kind, isContinuation } = kinds[i];
+        const prefix = kind === "question" ? "Q" : "A";
+        counts[kind] = (counts[kind] ?? 0) + 1;
+        const occurrence = counts[kind];
+        const filename = `${prefix}${q.index}${occurrence > 1 ? `-${occurrence}` : ""}.png`;
+        slides.push({ buffer, kind, isContinuation, filename });
+      }
+      return slides;
+    }),
+  );
+}
+
+/** Renders the chosen slides (by position) laid out side by side and returns
+ *  them as ONE picture. The side-by-side layout is done by the print page itself,
+ *  so this costs a single render and a single screenshot, with no per-slide PNGs
+ *  that then have to be decoded, stitched and encoded a second time. */
+export async function renderCombinedSlides(question: NormalizedQuestion, templateId: TemplateId, ctaText: string, requestOrigin: string, slideIndices: number[]): Promise<{ buffer: Buffer; names: string[] }> {
+  return withParkedImages(question, (q) =>
+    withPrintPage({ question: q, templateId, ctaText, combine: slideIndices }, requestOrigin, async (page) => {
+      const kinds = await page.evaluate(() => window.__SLIDE_KINDS__ ?? []);
+      const counts: Record<string, number> = {};
+      const names = kinds.map(({ kind }) => {
+        counts[kind] = (counts[kind] ?? 0) + 1;
+        return `${kind === "question" ? "Q" : "A"}${q.index}${counts[kind] > 1 ? `-${counts[kind]}` : ""}`;
+      });
+      const buffer = await page.locator("[data-combined]").screenshot({ type: "png" });
+      return { buffer, names: slideIndices.map((i) => names[i]).filter(Boolean) };
+    }),
+  );
 }

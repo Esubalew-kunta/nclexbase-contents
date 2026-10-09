@@ -42,15 +42,12 @@ function normalizeBowtieSection(section: RawBowtieSectionParsed | undefined, nam
     localIssues.push(`bowtie question is missing its "${name}" section`);
     return null;
   }
-  if (section.options.length !== 3) {
-    localIssues.push(`"${name}" must have exactly 3 options, got ${section.options.length}`);
-  }
   const labels = new Set<string>();
   for (const opt of section.options) {
     if (labels.has(opt.label)) localIssues.push(`"${name}" has a duplicate option label "${opt.label}"`);
     labels.add(opt.label);
   }
-  const rawCorrect = Array.isArray(section.correctAnswer) ? section.correctAnswer : [section.correctAnswer];
+  const rawCorrect = [...new Set(Array.isArray(section.correctAnswer) ? section.correctAnswer : [section.correctAnswer])];
   for (const ans of rawCorrect) {
     if (!labels.has(ans)) localIssues.push(`"${name}".correctAnswer "${ans}" does not match any option in that section`);
   }

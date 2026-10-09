@@ -73,9 +73,62 @@ function DownloadSlideButton({ question, templateId, slideIndex, ctaText }: { qu
   );
 }
 
+/** Download bar for joining the slides ticked on the thumbnails below into one
+ *  wide image, side by side in slide order. */
+function CombineBar({ question, templateId, ctaText, selected, total, onSelectAll, onClear }: { question: NormalizedQuestion; templateId: TemplateId; ctaText: string; selected: number[]; total: number; onSelectAll: () => void; onClear: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const usable = selected.length >= 2;
+
+  async function download() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/export/combined", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question, templateId, ctaText, slideIndices: selected }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error ?? `Download failed (${res.status})`);
+      }
+      const match = (res.headers.get("Content-Disposition") ?? "").match(/filename="([^"]+)"/);
+      downloadBlob(await res.blob(), match ? match[1] : `question-${question.index}-combined.png`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Download failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white p-3">
+      <span className="text-xs font-bold text-brand-dark">Combine side by side</span>
+      <span className="text-xs text-gray-500">Tick the slides you want below ({selected.length}/{total} selected)</span>
+      <button type="button" onClick={onSelectAll} className="text-xs font-semibold text-brand-teal hover:underline">
+        Select all
+      </button>
+      <button type="button" onClick={onClear} className="text-xs font-semibold text-gray-500 hover:underline">
+        Clear
+      </button>
+      <button
+        type="button"
+        disabled={!usable || busy}
+        onClick={download}
+        className="ml-auto rounded-lg bg-brand-gold px-4 py-1.5 text-sm font-semibold text-brand-dark hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        {busy ? "Rendering…" : usable ? `Download ${selected.length} as 1 image` : "Pick 2 or more"}
+      </button>
+      {error && <span className="w-full text-xs text-red-700">{error}</span>}
+    </div>
+  );
+}
+
 export function PreviewPane({ question, templateId, ctaText }: { question: NormalizedQuestion | null; templateId: TemplateId; ctaText: string }) {
   const { plan, measurer } = useSlidePlan(question, templateId, ctaText);
   const [zoomed, setZoomed] = useState<number | null>(null);
+  const [picked, setPicked] = useState<{ questionId: string; indices: number[] }>({ questionId: "", indices: [] });
   const [showTelegram, setShowTelegram] = useState(false);
 
   if (!question) {
@@ -85,6 +138,11 @@ export function PreviewPane({ question, templateId, ctaText }: { question: Norma
       </div>
     );
   }
+
+  // Ticks belong to the question they were made on.
+  const selected = question && picked.questionId === question.id ? picked.indices : [];
+  const toggle = (i: number) =>
+    setPicked({ questionId: question!.id, indices: selected.includes(i) ? selected.filter((x) => x !== i) : [...selected, i].sort((a, b) => a - b) });
 
   return (
     <div>
@@ -103,17 +161,30 @@ export function PreviewPane({ question, templateId, ctaText }: { question: Norma
             </button>
           </div>
 
+          <CombineBar
+            question={question}
+            templateId={templateId}
+            ctaText={ctaText}
+            selected={selected}
+            total={plan.slides.length}
+            onSelectAll={() => setPicked({ questionId: question.id, indices: plan.slides.map((_, i) => i) })}
+            onClear={() => setPicked({ questionId: question.id, indices: [] })}
+          />
+
           <div className="flex flex-wrap gap-4">
             {plan.slides.map((slide, i) => (
-              <button key={i} type="button" onClick={() => setZoomed(i)} className="block cursor-zoom-in">
-                <ScaledSlide maxWidth={240}>
-                  <SlideCanvas question={question} templateId={templateId} slide={slide} overallIndex={i + 1} overallTotal={plan.slides.length} />
-                </ScaledSlide>
-                <p className="mt-1 text-center text-xs text-gray-500">
+              <div key={i} className="flex w-[240px] max-w-full flex-col items-center">
+                <button type="button" onClick={() => setZoomed(i)} className="block w-full cursor-zoom-in">
+                  <ScaledSlide maxWidth={240}>
+                    <SlideCanvas question={question} templateId={templateId} slide={slide} overallIndex={i + 1} overallTotal={plan.slides.length} />
+                  </ScaledSlide>
+                </button>
+                <label className="mt-1 flex cursor-pointer items-center gap-1.5 text-xs text-gray-500">
+                  <input type="checkbox" checked={selected.includes(i)} onChange={() => toggle(i)} aria-label={`Include slide ${i + 1} in the combined image`} />
                   {slide.kind === "question" ? "Question" : "Answer"}
                   {slide.isContinuation ? " (cont.)" : ""}
-                </p>
-              </button>
+                </label>
+              </div>
             ))}
           </div>
 

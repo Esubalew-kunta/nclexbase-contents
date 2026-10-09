@@ -60,11 +60,25 @@ export default function PrintClient() {
           {plan.overflow.map((o) => `${o.kind} block "${o.blockIds.join('", "')}" (density tier: ${o.tier})`).join("; ")}
         </div>
       )}
-      {plan.slides.map((slide, i) => (
-        <div key={i} data-slide-index={i} style={{ width: 1080, height: 1920 }}>
-          <SlideCanvas question={payload.question} templateId={payload.templateId} slide={slide} overallIndex={i + 1} overallTotal={plan.slides.length} />
+      {payload.combine ? (
+        // One row holding only the chosen slides, so the exporter takes a single
+        // screenshot of the finished picture instead of stitching PNGs afterwards.
+        <div data-combined style={{ display: "flex", gap: 40, width: "max-content", background: "#e9eef0" }}>
+          {payload.combine
+            .filter((i) => plan.slides[i])
+            .map((i) => (
+              <div key={i} style={{ width: 1080, height: 1920 }}>
+                <SlideCanvas question={payload.question} templateId={payload.templateId} slide={plan.slides[i]} overallIndex={i + 1} overallTotal={plan.slides.length} />
+              </div>
+            ))}
         </div>
-      ))}
+      ) : (
+        plan.slides.map((slide, i) => (
+          <div key={i} data-slide-index={i} style={{ width: 1080, height: 1920 }}>
+            <SlideCanvas question={payload.question} templateId={payload.templateId} slide={slide} overallIndex={i + 1} overallTotal={plan.slides.length} />
+          </div>
+        ))
+      )}
     </div>
   );
 }

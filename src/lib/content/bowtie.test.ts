@@ -108,14 +108,11 @@ describe("bowtie parsing", () => {
     expect(parseOne(JSON.stringify(multi)).bowtie!.actionsToTake.correctAnswers).toEqual(["B", "C"]);
   });
 
-  it("requires exactly 3 options per section, since the question slide now lists every one of them", () => {
-    const tooMany = JSON.parse(BOWTIE_JSON) as { actionsToTake: { options: { label: string; text: string }[] } };
-    tooMany.actionsToTake.options.push({ label: "D", text: "Notify the provider of the oliguria" });
-    expect(parseWithIssues(JSON.stringify(tooMany)).some((m) => /"actionsToTake" must have exactly 3 options, got 4/.test(m))).toBe(true);
-
-    const tooFew = JSON.parse(BOWTIE_JSON) as { parametersToMonitor: { options: { label: string; text: string }[] } };
-    tooFew.parametersToMonitor.options.pop();
-    expect(parseWithIssues(JSON.stringify(tooFew)).some((m) => /"parametersToMonitor" must have exactly 3 options, got 2/.test(m))).toBe(true);
+  it("accepts any number of options per section", () => {
+    const b = JSON.parse(BOWTIE_JSON) as { actionsToTake: { options: { label: string; text: string }[] }; parametersToMonitor: { options: { label: string; text: string }[] } };
+    b.actionsToTake.options.push({ label: "D", text: "Notify the provider of the oliguria" });
+    b.parametersToMonitor.options.pop();
+    expect(parseWithIssues(JSON.stringify(b))).toEqual([]);
   });
 
   it("never puts bowtie options in the flat options list", () => {
@@ -160,11 +157,31 @@ describe("bowtie slide blocks", () => {
 describe("bowtie diagram shape", () => {
   const bowtie = () => parseOne(BOWTIE_JSON).bowtie!;
 
-  it("is always 2 boxes left, 1 centre, 2 right on the question slide", () => {
-    // Fixed by the format, not by the data: the sample bowtie offers three
-    // options in the middle group but that still gets exactly one box.
+  it("draws one blank box per correct answer on the question slide", () => {
+    // The sample has one correct answer per section, so 1-1-1.
     const model = buildBowtieDiagram(bowtie(), "question");
-    expect(model.columns.map((c) => c.boxes.length)).toEqual([2, 1, 2]);
+    expect(model.columns.map((c) => c.boxes.length)).toEqual([1, 1, 1]);
+  });
+
+  it.each([
+    [[2, 1, 2]],
+    [[3, 2, 3]],
+    [[2, 2, 2]],
+    [[1, 3, 1]],
+  ])("supports a %j arrangement, identical on both slides", (counts) => {
+    const b = JSON.parse(BOWTIE_JSON) as Record<string, { options: { label: string; text: string }[]; correctAnswer: string[] }>;
+    const keys = ["actionsToTake", "conditionMostLikely", "parametersToMonitor"];
+    keys.forEach((k, i) => {
+      b[k].options = Array.from({ length: counts[i] + 1 }, (_, n) => ({ label: `L${n}`, text: `${k} option ${n}` }));
+      b[k].correctAnswer = b[k].options.slice(0, counts[i]).map((o) => o.label);
+    });
+    const bowtie = parseOne(JSON.stringify(b)).bowtie!;
+    const q = buildBowtieDiagram(bowtie, "question");
+    const a = buildBowtieDiagram(bowtie, "answer");
+    expect(q.columns.map((c) => c.boxes.length)).toEqual(counts);
+    expect(a.columns.map((c) => c.boxes.length)).toEqual(counts);
+    expect(a.columns.flatMap((c) => c.boxes.map((x) => x.text))).not.toContain(null);
+    expect(q.columns.flatMap((c) => c.boxes.map((x) => x.letter))).toEqual(a.columns.flatMap((c) => c.boxes.map((x) => x.letter)));
   });
 
   it("uses the three NGN headings in left, centre, right order", () => {
@@ -177,11 +194,11 @@ describe("bowtie diagram shape", () => {
     expect(model.columns.map((c) => c.isCenter)).toEqual([false, true, false]);
   });
 
-  it("labels the question slide's boxes A-E positionally, left column first", () => {
+  it("labels the boxes positionally from A, left column first", () => {
     // The source JSON labels its sections A/B/C, 1/2/3 and X/Y/Z, which are
     // three separate sequences and don't form one readable run.
     const model = buildBowtieDiagram(bowtie(), "question");
-    expect(model.columns.flatMap((c) => c.boxes.map((b) => b.letter))).toEqual(["A", "B", "C", "D", "E"]);
+    expect(model.columns.flatMap((c) => c.boxes.map((b) => b.letter))).toEqual(["A", "B", "C"]);
   });
 
   it("uses the same letters for the same positions on both slides", () => {
@@ -197,7 +214,7 @@ describe("bowtie diagram shape", () => {
 
   it("leaves every box empty on the question slide", () => {
     const model = buildBowtieDiagram(bowtie(), "question");
-    expect(model.columns.flatMap((c) => c.boxes.map((b) => b.text))).toEqual([null, null, null, null, null]);
+    expect(model.columns.flatMap((c) => c.boxes.map((b) => b.text))).toEqual([null, null, null]);
   });
 
   it("shows one filled box per correct answer on the answer slide", () => {
@@ -222,8 +239,8 @@ describe("bowtie diagram shape", () => {
     multi.parametersToMonitor.correctAnswer = ["X", "Y"];
     const model = buildBowtieDiagram(parseOne(JSON.stringify(multi)).bowtie!, "answer");
     expect(model.columns[2].boxes).toHaveLength(2);
-    // Right column starts at D: left takes A-B, the centre takes C.
-    expect(model.columns[2].boxes.map((b) => b.letter)).toEqual(["D", "E"]);
+    // Right column starts at C: left and centre take one box each.
+    expect(model.columns[2].boxes.map((b) => b.letter)).toEqual(["C", "D"]);
   });
 
   it("never shows an incorrect option on the answer slide", () => {
@@ -234,31 +251,6 @@ describe("bowtie diagram shape", () => {
     expect(shown.join(" ")).not.toContain("daily weight");
   });
 
-  it("flags a section that offers more options than the format's box count", () => {
-    // normalize.ts now rejects more-or-fewer-than-3 at the JSON layer (see the
-    // "requires exactly 3 options" test above), but the model itself stays
-    // defensive about box count regardless of how many options reach it — so
-    // this builds the overfull section by hand rather than through the parser.
-    // Never silently narrow the options a learner is choosing between.
-    const overfull = bowtie();
-    overfull.actionsToTake.options.push({ label: "D", text: "Notify the provider of the oliguria" });
-    expect(buildBowtieDiagram(overfull, "question").extended).toBe(true);
-  });
-
-  it("keeps the fixed box count even when a section overflows it", () => {
-    const overfull = bowtie();
-    overfull.actionsToTake.options.push({ label: "D", text: "Notify the provider of the oliguria" });
-    overfull.actionsToTake.correctAnswers = ["B", "D"];
-
-    const question = buildBowtieDiagram(overfull, "question");
-    expect(question.columns.map((c) => c.boxes.length)).toEqual([2, 1, 2]);
-
-    // Two correct actions, so the answer slide grows to two filled boxes — the
-    // shape stays correct rather than dropping the second answer.
-    const answer = buildBowtieDiagram(overfull, "answer");
-    expect(answer.columns[0].boxes.map((b) => b.letter)).toEqual(["A", "B"]);
-  });
-
   it("keeps a box on the answer slide when a section has no parsable answer", () => {
     // The parser rejects this, so build the section by hand to prove the model
     // degrades safely on data that slipped through.
@@ -267,5 +259,41 @@ describe("bowtie diagram shape", () => {
     const model = buildBowtieDiagram(b, "answer");
     expect(model.columns[1].boxes).toHaveLength(1);
     expect(model.columns[1].boxes[0].text).toBeNull();
+  });
+});
+
+describe("attached question image", () => {
+  const withImage = (position: "top" | "bottom") => ({ ...parseOne(BOWTIE_JSON), image: { src: "data:image/jpeg;base64,AAAA", width: 800, height: 400, position } });
+
+  it("goes first when the position is top", () => {
+    expect(buildQuestionBlocks(withImage("top")).map((b) => b.kind)).toEqual(["question-image", "question-text", "bowtie-diagram"]);
+  });
+
+  it("goes last when the position is bottom", () => {
+    expect(buildQuestionBlocks(withImage("bottom")).map((b) => b.kind)).toEqual(["question-text", "bowtie-diagram", "question-image"]);
+  });
+
+  it("never reaches the answer slides", () => {
+    expect(buildAnswerBlocks(withImage("top"), "").some((b) => (b.kind as string) === "question-image")).toBe(false);
+  });
+});
+
+describe("attached answer image", () => {
+  const withAnswerImage = (position: "top" | "bottom") => ({ ...parseOne(BOWTIE_JSON), answerImage: { src: "data:image/jpeg;base64,AAAA", width: 800, height: 400, position } });
+
+  it("goes first when the position is top", () => {
+    expect(buildAnswerBlocks(withAnswerImage("top"), "Join us").map((b) => b.kind)).toEqual(["answer-image", "bowtie-diagram", "why", "keypoint", "cta"]);
+  });
+
+  it("goes above the CTA banner when the position is bottom", () => {
+    expect(buildAnswerBlocks(withAnswerImage("bottom"), "Join us").map((b) => b.kind)).toEqual(["bowtie-diagram", "why", "keypoint", "answer-image", "cta"]);
+  });
+
+  it("goes last when there is no CTA", () => {
+    expect(buildAnswerBlocks(withAnswerImage("bottom"), "").map((b) => b.kind).at(-1)).toBe("answer-image");
+  });
+
+  it("never reaches the question slides", () => {
+    expect(buildQuestionBlocks(withAnswerImage("top")).some((b) => (b.kind as string) === "answer-image")).toBe(false);
   });
 });

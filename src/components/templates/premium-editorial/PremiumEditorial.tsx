@@ -3,6 +3,7 @@ import type { AnswerBlock, QuestionBlock } from "@/lib/slides/blocks";
 import type { SlideFrameProps, TemplateModule } from "@/lib/slides/registry";
 import type { TemplateMeta } from "@/lib/slides/types";
 import { QUESTION_LABEL, CTA_TITLE } from "@/lib/slides/chrome-copy";
+import { QuestionImageBlock } from "@/components/slides/QuestionImageBlock";
 import { BowtieDiagram } from "@/components/slides/BowtieDiagram";
 import { bowtieTheme } from "@/components/slides/bowtieThemes";
 import { PaperPlaneIcon } from "@/components/slides/PaperPlaneIcon";
@@ -42,6 +43,9 @@ function Chrome({ question, numeral, label }: { question: { category: string | n
 }
 
 export function QuestionBlockView({ block }: { block: QuestionBlock }) {
+  if (block.kind === "question-image") {
+    return <QuestionImageBlock src={block.src} width={block.width} height={block.height} />;
+  }
   if (block.kind === "question-text") {
     return <p className={styles.qtext}>{block.text}</p>;
   }
@@ -62,6 +66,8 @@ export function QuestionBlockView({ block }: { block: QuestionBlock }) {
 
 export function AnswerBlockView({ block }: { block: AnswerBlock }) {
   switch (block.kind) {
+    case "answer-image":
+      return <QuestionImageBlock src={block.src} width={block.width} height={block.height} />;
     case "correct-single":
     case "correct-open":
       return (

@@ -11,6 +11,7 @@ import type { NormalizedBowtie, NormalizedQuestion } from "@/lib/content/types";
 export type QuestionBlock =
   | { id: string; kind: "question-text"; text: string }
   | { id: string; kind: "option"; label: string; text: string }
+  | { id: string; kind: "question-image"; src: string; width: number; height: number }
   // The whole bowtie is ONE block, never a series of per-option blocks: the
   // NGN diagram's connector lines are meaningless if the three columns are
   // split across slides, and splitting them would also strand the middle
@@ -26,6 +27,7 @@ export type AnswerBlock =
   | { id: string; kind: "wrong"; label: string; text: string; isFirst: boolean }
   | { id: string; kind: "keypoint"; text: string }
   | { id: string; kind: "cta"; text: string }
+  | { id: string; kind: "answer-image"; src: string; width: number; height: number }
   | { id: string; kind: "bowtie-diagram"; bowtie: NormalizedBowtie; mode: "question" | "answer" };
 
 export function buildQuestionBlocks(q: NormalizedQuestion): QuestionBlock[] {
@@ -33,16 +35,36 @@ export function buildQuestionBlocks(q: NormalizedQuestion): QuestionBlock[] {
 
   if (q.format === "bowtie" && q.bowtie) {
     blocks.push({ id: "bowtie", kind: "bowtie-diagram", bowtie: q.bowtie, mode: "question" });
-    return blocks;
+  } else {
+    for (const opt of q.options) {
+      blocks.push({ id: `opt-${opt.label}`, kind: "option", label: opt.label, text: opt.text });
+    }
   }
 
-  for (const opt of q.options) {
-    blocks.push({ id: `opt-${opt.label}`, kind: "option", label: opt.label, text: opt.text });
+  // An attached picture is its own block, so the paginator treats it like any
+  // other: it sits on the slide when there is room and moves to the next one
+  // when there is not, never overlapping text.
+  if (q.image) {
+    const block: QuestionBlock = { id: "qimage", kind: "question-image", src: q.image.src, width: q.image.width, height: q.image.height };
+    if (q.image.position === "top") blocks.unshift(block);
+    else blocks.push(block);
   }
   return blocks;
 }
 
 export function buildAnswerBlocks(q: NormalizedQuestion, ctaText: string): AnswerBlock[] {
+  const blocks = buildAnswerContentBlocks(q, ctaText);
+  if (!q.answerImage) return blocks;
+  const image: AnswerBlock = { id: "aimage", kind: "answer-image", src: q.answerImage.src, width: q.answerImage.width, height: q.answerImage.height };
+  if (q.answerImage.position === "top") return [image, ...blocks];
+  // Bottom sits under the explanation and key point but above the closing CTA
+  // banner, which stays the last thing on the slide.
+  const ctaAt = blocks.findIndex((b) => b.kind === "cta");
+  if (ctaAt === -1) return [...blocks, image];
+  return [...blocks.slice(0, ctaAt), image, ...blocks.slice(ctaAt)];
+}
+
+function buildAnswerContentBlocks(q: NormalizedQuestion, ctaText: string): AnswerBlock[] {
   const blocks: AnswerBlock[] = [];
 
   if (q.format === "bowtie" && q.bowtie) {

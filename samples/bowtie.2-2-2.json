@@ -1,0 +1,33 @@
+{
+  "id": "bowtie-222-01",
+  "type": "bowtie",
+  "question": "A client with type 1 diabetes is brought to the emergency department with abdominal pain, deep rapid breathing, a fruity breath odor, a blood glucose of 480 mg/dL, and positive serum ketones.",
+  "actionsToTake": {
+    "options": [
+      { "label": "A", "text": "Start an IV infusion of 0.9% sodium chloride" },
+      { "label": "B", "text": "Begin a continuous regular insulin IV infusion as prescribed" },
+      { "label": "C", "text": "Give a rapid-acting carbohydrate such as orange juice" },
+      { "label": "D", "text": "Withhold all fluids to prevent fluid overload" }
+    ],
+    "correctAnswer": ["A", "B"]
+  },
+  "conditionMostLikely": {
+    "options": [
+      { "label": "1", "text": "Diabetic ketoacidosis" },
+      { "label": "2", "text": "Hypoglycemia" },
+      { "label": "3", "text": "Hyperosmolar hyperglycemic state" }
+    ],
+    "correctAnswer": ["1", "3"]
+  },
+  "parametersToMonitor": {
+    "options": [
+      { "label": "X", "text": "Serum potassium level" },
+      { "label": "Y", "text": "Blood glucose every hour" },
+      { "label": "Z", "text": "Bowel sounds" },
+      { "label": "W", "text": "Skin turgor of the heels" }
+    ],
+    "correctAnswer": ["X", "Y"]
+  },
+  "explanation": "Hyperglycemia with ketones, deep rapid (Kussmaul) respirations, and a fruity breath odor indicate diabetic ketoacidosis. Treatment starts with IV fluids to correct dehydration, followed by IV insulin. Potassium shifts as insulin drives it into cells, so serum potassium and hourly glucose must be monitored closely.",
+  "keyPoint": "In DKA, start fluids first, then insulin, and watch potassium closely."
+}

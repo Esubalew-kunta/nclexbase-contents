@@ -38,6 +38,17 @@ export interface NormalizedOption {
   text: string;
 }
 
+/** An illustration the user attached in the app (not part of the question JSON).
+ *  `width`/`height` are the natural pixel size, kept so the slide can reserve the
+ *  right amount of space before the picture has decoded — pagination measures
+ *  block heights synchronously and an unloaded <img> would measure as zero. */
+export interface QuestionImage {
+  src: string;
+  width: number;
+  height: number;
+  position: "top" | "bottom";
+}
+
 export interface NormalizedBowtieSection {
   options: NormalizedOption[];
   correctAnswers: string[];
@@ -67,6 +78,10 @@ export interface NormalizedQuestion {
   notes: string | null;
   format: SlideFormat;
   bowtie: NormalizedBowtie | null;
+  /** Optional user-attached picture, shown on the question slides only. */
+  image?: QuestionImage | null;
+  /** Optional user-attached picture, shown on the answer slides only. */
+  answerImage?: QuestionImage | null;
 }
 
 export const CATEGORY_LABELS: Record<string, string> = {

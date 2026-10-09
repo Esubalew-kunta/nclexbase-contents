@@ -4,19 +4,23 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { parseQuestionsJson, type ValidationIssue } from "@/lib/content/normalize";
-import type { NormalizedQuestion } from "@/lib/content/types";
+import type { NormalizedQuestion, QuestionImage } from "@/lib/content/types";
 import { DEFAULT_TEMPLATE_ID } from "@/components/templates";
 import { DEFAULT_CTA_TEXT } from "@/lib/slides/chrome-copy";
 import type { TemplateId } from "@/lib/slides/types";
 import { UploadPanel } from "./UploadPanel";
 import { QuestionLibrary } from "./QuestionLibrary";
 import { TemplatePicker } from "./TemplatePicker";
+import { QuestionImagePicker } from "./QuestionImagePicker";
 import { PreviewPane } from "./PreviewPane";
 import { ExportPanel } from "./ExportPanel";
 import { BatchScheduleModal } from "./BatchScheduleModal";
 
 export function AppShell() {
-  const [questions, setQuestions] = useState<NormalizedQuestion[]>([]);
+  const [baseQuestions, setQuestions] = useState<NormalizedQuestion[]>([]);
+  // Pictures attached in this session, by question id. Kept apart from the parsed
+  // questions so re-importing JSON never has to know about them.
+  const [images, setImages] = useState<Record<string, { question?: QuestionImage; answer?: QuestionImage }>>({});
   const [issues, setIssues] = useState<ValidationIssue[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
   const [sourceName, setSourceName] = useState<string | null>(null);
@@ -27,9 +31,24 @@ export function AppShell() {
   const [showBatchSchedule, setShowBatchSchedule] = useState(false);
   const [telegramSettings, setTelegramSettings] = useState<{ daily_time: string; timezone: string } | null>(null);
 
+  const questions = useMemo(() => baseQuestions.map((q) => (images[q.id] ? { ...q, image: images[q.id].question ?? null, answerImage: images[q.id].answer ?? null } : q)), [baseQuestions, images]);
+
+  function setActiveImage(side: "question" | "answer", image: QuestionImage | null) {
+    if (!activeId) return;
+    setImages((prev) => {
+      const entry = { ...prev[activeId] };
+      if (image) entry[side] = image;
+      else delete entry[side];
+      const next = { ...prev, [activeId]: entry };
+      if (!entry.question && !entry.answer) delete next[activeId];
+      return next;
+    });
+  }
+
   function handleJsonText(text: string, name: string) {
     const { result, parseError } = parseQuestionsJson(text);
     setSourceName(name);
+    setImages({});
     if (parseError) {
       setParseError(parseError);
       setQuestions([]);
@@ -102,6 +121,35 @@ export function AppShell() {
             <UploadPanel onJsonText={handleJsonText} />
             {sourceName && <p className="mt-2 text-xs text-gray-500">Loaded: {sourceName}</p>}
             {parseError && <p className="mt-2 rounded-lg bg-red-50 p-3 text-xs text-red-800">Invalid JSON — {parseError}</p>}
+
+            <label className="mt-4 block text-xs font-bold text-brand-dark">Question image (optional)</label>
+            {activeQuestion ? (
+              <div className="mt-1.5">
+                <QuestionImagePicker
+                  key={`q-${activeQuestion.id}`}
+                  image={activeQuestion.image ?? null}
+                  onChange={(img) => setActiveImage("question", img)}
+                  hint="Shown on the question slide only, at the top or bottom. If there isn't room beside the text it moves to a continuation slide."
+                />
+              </div>
+            ) : (
+              <p className="mt-1 text-xs text-gray-400">Import a JSON first, then attach images to the selected question here.</p>
+            )}
+
+            {activeQuestion && (
+              <>
+                <label className="mt-4 block text-xs font-bold text-brand-dark">Answer image (optional)</label>
+                <div className="mt-1.5">
+                  <QuestionImagePicker
+                    key={`a-${activeQuestion.id}`}
+                    image={activeQuestion.answerImage ?? null}
+                    onChange={(img) => setActiveImage("answer", img)}
+                    addLabel="+ Add image to the answer"
+                    hint="Shown on the answer slide only. Top is above the answer; bottom is under the explanation, above the Telegram banner."
+                  />
+                </div>
+              </>
+            )}
 
             <label className="mt-4 block text-xs font-bold text-brand-dark">Bottom-of-answer CTA text</label>
             <input

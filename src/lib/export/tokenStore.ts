@@ -7,6 +7,9 @@ export interface PrintPayload {
   question: NormalizedQuestion;
   templateId: TemplateId;
   ctaText: string;
+  /** Slide positions to lay out side by side in one picture instead of the
+   *  usual vertical stack. Set only by the combined-image export. */
+  combine?: number[];
 }
 
 // Hands a question to the Playwright-driven /print page.
