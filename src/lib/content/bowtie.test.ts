@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseQuestionsJson, type ParseResult } from "./normalize";
 import { buildAnswerBlocks, buildQuestionBlocks } from "@/lib/slides/blocks";
-import { buildBowtieDiagram } from "./bowtieModel";
+import { buildBowtieDiagram, optionLabel } from "./bowtieModel";
 import type { NormalizedQuestion } from "./types";
 
 /** A realistic NGN bowtie: 3 options in every section (the fixed authoring
@@ -194,17 +194,12 @@ describe("bowtie diagram shape", () => {
     expect(model.columns.map((c) => c.isCenter)).toEqual([false, true, false]);
   });
 
-  it("labels the boxes positionally from A, left column first", () => {
-    // The source JSON labels its sections A/B/C, 1/2/3 and X/Y/Z, which are
-    // three separate sequences and don't form one readable run.
+  it("gives each column its own letter: A actions, B condition, C parameters", () => {
     const model = buildBowtieDiagram(bowtie(), "question");
     expect(model.columns.flatMap((c) => c.boxes.map((b) => b.letter))).toEqual(["A", "B", "C"]);
   });
 
-  it("uses the same letters for the same positions on both slides", () => {
-    // Box "A" on the question page must be the box filled in on the answer page,
-    // which only works because the letters come from the column position and not
-    // from a counter that advances differently on each slide.
+  it("uses the same letters on both slides", () => {
     const question = buildBowtieDiagram(bowtie(), "question");
     const answer = buildBowtieDiagram(bowtie(), "answer");
     for (const [i, col] of question.columns.entries()) {
@@ -239,8 +234,8 @@ describe("bowtie diagram shape", () => {
     multi.parametersToMonitor.correctAnswer = ["X", "Y"];
     const model = buildBowtieDiagram(parseOne(JSON.stringify(multi)).bowtie!, "answer");
     expect(model.columns[2].boxes).toHaveLength(2);
-    // Right column starts at C: left and centre take one box each.
-    expect(model.columns[2].boxes.map((b) => b.letter)).toEqual(["C", "D"]);
+    // Every box in a column carries that column's letter.
+    expect(model.columns[2].boxes.map((b) => b.letter)).toEqual(["C", "C"]);
   });
 
   it("never shows an incorrect option on the answer slide", () => {
@@ -295,5 +290,35 @@ describe("attached answer image", () => {
 
   it("never reaches the question slides", () => {
     expect(buildQuestionBlocks(withAnswerImage("top")).some((b) => (b.kind as string) === "answer-image")).toBe(false);
+  });
+});
+
+describe("bowtie option labels", () => {
+  const model = () => buildBowtieDiagram(parseOne(BOWTIE_JSON).bowtie!, "answer");
+
+  it("labels options I, II, III / 1, 2, 3 / a, b, c by column", () => {
+    const labels = model().columns.map((c) => c.optionLabels);
+    expect(labels[0].slice(0, 3)).toEqual(["I", "II", "III"]);
+    expect(labels[1].slice(0, 3)).toEqual(["1", "2", "3"]);
+    expect(labels[2].slice(0, 3)).toEqual(["a", "b", "c"]);
+  });
+
+  it("writes roman numerals correctly past three", () => {
+    expect([3, 4, 5, 8, 9].map((n) => optionLabel("roman", n))).toEqual(["IV", "V", "VI", "IX", "X"]);
+  });
+
+  it("summarises the answer as column letter plus the labels of its correct options", () => {
+    const b = JSON.parse(BOWTIE_JSON) as Record<string, { options: { label: string; text: string }[]; correctAnswer: string[] }>;
+    b.actionsToTake.options = ["A", "B", "C", "D"].map((l) => ({ label: l, text: `act ${l}` }));
+    b.actionsToTake.correctAnswer = ["A", "C"];
+    b.parametersToMonitor.options = ["X", "Y", "Z"].map((l) => ({ label: l, text: `par ${l}` }));
+    b.parametersToMonitor.correctAnswer = ["Z", "X"];
+    const m = buildBowtieDiagram(parseOne(JSON.stringify(b)).bowtie!, "answer");
+    expect(m.summary[0]).toEqual({ letter: "A", labels: ["I", "III"] });
+    expect(m.summary[2]).toEqual({ letter: "C", labels: ["a", "c"] });
+  });
+
+  it("has no summary on the question slide", () => {
+    expect(buildBowtieDiagram(parseOne(BOWTIE_JSON).bowtie!, "question").summary).toEqual([]);
   });
 });

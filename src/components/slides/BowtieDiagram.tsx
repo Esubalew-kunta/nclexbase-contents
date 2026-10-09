@@ -40,26 +40,52 @@ export function BowtieDiagram({ bowtie, mode, theme }: { bowtie: NormalizedBowti
         <div key={col.key} className={styles.column} data-column={col.key}>
           <p className={styles.heading}>{col.title}</p>
           <div className={styles.stack}>
-            {col.boxes.map((box) => (
-              <div key={box.letter} className={`${styles.box} ${box.isCenter && box.text ? styles.boxCenter : ""} ${box.text ? styles.boxFilled : ""}`}>
-                <span className={styles.letter}>{box.letter}</span>
-                {/* A blank answer box still needs room, or the question slide's
-                    boxes collapse and the two slides stop matching in shape. */}
-                {box.text ? <p className={styles.text}>{box.text}</p> : <span className={styles.blank} aria-hidden />}
-              </div>
-            ))}
+            {col.boxes.map((box) => {
+              // One letter per column, not per box: it sits on the seam between the
+              // column's top and bottom boxes. With three or more boxes it takes the
+              // middle seam; a lone box has no seam, so it sits on that box's top edge.
+              const seamAfter = col.boxes.length > 1 ? Math.floor((col.boxes.length - 1) / 2) : -1;
+              const showLetter = col.boxes.length === 1 || box.indexInColumn === seamAfter;
+              return (
+                <div key={box.indexInColumn} className={`${styles.slot} ${col.boxes.length === 1 ? styles.slotSolo : styles.slotSeam}`}>
+                  <div className={`${styles.box} ${box.isCenter && box.text ? styles.boxCenter : ""} ${box.text ? styles.boxFilled : ""}`}>
+                    {/* A blank answer box still needs room, or the question slide's
+                        boxes collapse and the two slides stop matching in shape. */}
+                    {box.text ? (
+                      <p className={styles.text}>
+                        {box.optionLabel && <span className={styles.optionLabel}>{box.optionLabel}.{" "}</span>}
+                        {box.text}
+                      </p>
+                    ) : (
+                      <span className={styles.blank} aria-hidden />
+                    )}
+                  </div>
+                  {showLetter && <span className={styles.columnLetter}>{box.letter}</span>}
+                </div>
+              );
+            })}
           </div>
           {mode === "question" && (
             <div className={styles.optionList}>
-              {bowtie[col.key].options.map((opt) => (
-                <p key={opt.label} className={styles.optionCard}>
-                  {opt.text}
+              {bowtie[col.key].options.map((opt, n) => (
+                <p key={`${opt.label}-${n}`} className={styles.optionCard}>
+                  <span className={styles.optionBadge}>{col.optionLabels[n]}</span>
+                  <span className={styles.optionText}>{opt.text}</span>
                 </p>
               ))}
             </div>
           )}
         </div>
       ))}
+      {mode === "answer" && model.summary.length > 0 && (
+        <p className={styles.summary}>
+          {model.summary.map((s) => (
+            <span key={s.letter} className={styles.summaryItem}>
+              <b>{s.letter}</b> ({s.labels.join(", ")})
+            </span>
+          ))}
+        </p>
+      )}
     </div>
   );
 }
