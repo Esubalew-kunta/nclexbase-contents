@@ -36,7 +36,24 @@ const LAUNCH_ARGS = [
   "--disable-backgrounding-occluded-windows",
   "--disable-renderer-backgrounding",
   "--disable-features=Translate,BackForwardCache,AcceptCHFrame,MediaRouter,OptimizationHints",
+  // The host runs on 512 MiB in total, shared with Node, and Chrome is what
+  // gets the container OOM-killed. These four trim its footprint by roughly
+  // 50 MB on a three-slide question and were checked to produce byte-identical
+  // PNGs, so nothing about the exported picture changes.
+  "--renderer-process-limit=1",
+  "--disable-software-rasterizer",
+  "--disk-cache-size=1",
+  "--media-cache-size=1",
 ];
+
+/** Renders served by the current browser process. Chrome's own memory creeps up
+ *  across renders — caches, the network stack, per-navigation allocations — and
+ *  on a 512 MiB instance that creep is what eventually trips the OOM killer
+ *  rather than any single large page. Recycling the process on a fixed count
+ *  returns all of it at the cost of one relaunch (about a second) every so
+ *  often, which is far cheaper than the crash it prevents. */
+let rendersServed = 0;
+const RENDERS_PER_BROWSER = 25;
 
 function launch(): Promise<Browser> {
   const promise = chromium
@@ -61,9 +78,18 @@ function launch(): Promise<Browser> {
 export async function getBrowser(): Promise<Browser> {
   if (browserPromise) {
     const existing = await browserPromise.catch(() => null);
-    if (existing && existing.isConnected()) return existing;
+    if (existing && existing.isConnected()) {
+      if (rendersServed < RENDERS_PER_BROWSER) {
+        rendersServed++;
+        return existing;
+      }
+      // Closed without awaiting: the caller only needs the replacement, and a
+      // slow shutdown of the old process must not be charged to this export.
+      void existing.close().catch(() => undefined);
+    }
     browserPromise = null;
   }
+  rendersServed = 1;
   browserPromise = launch();
   return browserPromise;
 }

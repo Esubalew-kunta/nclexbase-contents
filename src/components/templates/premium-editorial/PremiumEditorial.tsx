@@ -32,7 +32,7 @@ function Chrome({ question, numeral, label }: { question: { category: string | n
       <div className={styles.numeral}>{String(numeral).padStart(2, "0")}</div>
       <div className={styles.topRow}>
         <span className={styles.brandRow}>
-          <Image className={styles.logo} src={BRAND} alt="" width={36} height={36} unoptimized />
+          <Image className={styles.logo} src={BRAND} alt="" width={36} height={36} loading="eager" unoptimized />
           <span className={styles.brand}>NCLEXBase</span>
         </span>
       </div>

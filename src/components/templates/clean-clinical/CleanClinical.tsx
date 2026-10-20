@@ -32,7 +32,7 @@ function Header({ question }: { question: { category: string | null } }) {
   return (
     <div className={styles.topRow}>
       <span className={styles.brandRow}>
-        <Image className={styles.logo} src={BRAND} alt="" width={42} height={42} unoptimized />
+        <Image className={styles.logo} src={BRAND} alt="" width={42} height={42} loading="eager" unoptimized />
         <span className={styles.brand}>NCLEXBase</span>
       </span>
       {question.category && <span className={styles.cat}>{question.category}</span>}

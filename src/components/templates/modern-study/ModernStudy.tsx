@@ -136,7 +136,7 @@ function Band({ question, title, isContinuation, contLabel }: { question: { cate
   return (
     <div className={styles.band}>
       <span className={styles.brandRow}>
-        <Image className={styles.logo} src={BRAND} alt="" width={44} height={44} unoptimized />
+        <Image className={styles.logo} src={BRAND} alt="" width={44} height={44} loading="eager" unoptimized />
         <span className={styles.brand}>NCLEXBase</span>
       </span>
       {isContinuation ? <span className={styles.contLabel}>{contLabel}</span> : question.category ? <span className={styles.cat}>{question.category}</span> : null}

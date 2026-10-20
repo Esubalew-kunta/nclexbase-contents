@@ -72,7 +72,7 @@ async function withPrintPage<T>(payload: PrintPayload, requestOrigin: string, ca
       const browser = await getBrowser();
       const page = await browser.newPage({ viewport: { width: 1200, height: 1200 } });
       try {
-        await page.goto(`${origin}/print?token=${token}`, { waitUntil: "load" });
+        await page.goto(`${origin}/print?token=${token}`, { waitUntil: "domcontentloaded" });
         await page.waitForFunction(() => window.__READY__ === true, { timeout: 15000 });
 
         // Checked before screenshotting: once a block is taller than the slide it
@@ -83,7 +83,31 @@ async function withPrintPage<T>(payload: PrintPayload, requestOrigin: string, ca
 
         // Layout never waits on pictures (their height comes from CSS), so make
         // sure they have actually painted before the screenshots are taken.
-        await page.evaluate(() => Promise.all(Array.from(document.images).map((img) => (img.complete ? null : new Promise((r) => { img.onload = img.onerror = r; })))));
+        //
+        // Every image is forced eager first. The viewport is one slide tall while
+        // a question renders as several stacked 1920px slides, so anything from
+        // the third slide down sits far outside Chrome's lazy-load margin and
+        // never starts loading at all — `complete` stays false forever and this
+        // wait used to burn its whole budget and then fail the export. Flipping
+        // the attribute and re-assigning `src` starts those fetches immediately.
+        await page.evaluate(() => {
+          for (const image of document.images) {
+            if (image.loading === "lazy") image.loading = "eager";
+            if (!image.complete && image.src) {
+              const src = image.src;
+              image.src = "";
+              image.src = src;
+            }
+          }
+        });
+        await page.waitForFunction(
+          // naturalWidth covers an image that has decoded but whose load event
+          // Chrome has not yet flushed; a failed fetch sets `complete` too, so a
+          // broken picture is not able to stall the export either.
+          () => Array.from(document.images).every((image) => image.complete || image.naturalWidth > 0),
+          undefined,
+          { timeout: 15000 },
+        );
 
         return await capture(page);
       } finally {
@@ -121,6 +145,29 @@ export async function renderQuestionSlides(question: NormalizedQuestion, templat
         slides.push({ buffer, kind, isContinuation, filename });
       }
       return slides;
+    }),
+  );
+}
+
+/** Renders one selected slide without screenshotting the rest. */
+export async function renderQuestionSlide(
+  question: NormalizedQuestion,
+  templateId: TemplateId,
+  ctaText: string,
+  requestOrigin: string,
+  slideIndex: number,
+): Promise<RenderedSlide> {
+  return withParkedImages(question, (q) =>
+    withPrintPage({ question: q, templateId, ctaText }, requestOrigin, async (page) => {
+      const kinds = await page.evaluate(() => window.__SLIDE_KINDS__ ?? []);
+      const selected = kinds[slideIndex];
+      if (!selected) throw new Error("slideIndex out of range");
+
+      const occurrence = kinds.slice(0, slideIndex + 1).filter((slide) => slide.kind === selected.kind).length;
+      const prefix = selected.kind === "question" ? "Q" : "A";
+      const filename = `${prefix}${q.index}${occurrence > 1 ? `-${occurrence}` : ""}.png`;
+      const buffer = await page.locator(`[data-slide-index="${slideIndex}"]`).screenshot({ type: "png" });
+      return { buffer, kind: selected.kind, isContinuation: selected.isContinuation, filename };
     }),
   );
 }
