@@ -70,19 +70,52 @@ describe("browser pool", () => {
     for (let i = 0; i < 24; i++) await render();
     const inFlight = (await acquireBrowser()) as unknown as FakeBrowser;
 
-    // A second render arriving while the first is still open must not retire
-    // the browser the first one is rendering in.
-    const concurrent = (await acquireBrowser()) as unknown as FakeBrowser;
+    // A second render arriving now must wait rather than retire the browser
+    // the first one is still rendering in.
+    let secondStarted = false;
+    const second = acquireBrowser().then((browser) => {
+      secondStarted = true;
+      return browser as unknown as FakeBrowser;
+    });
+    await Promise.resolve();
+    expect(secondStarted).toBe(false);
     expect(inFlight.closed).toBe(false);
-    expect(concurrent).toBe(inFlight);
 
     releaseBrowser();
+    const secondBrowser = await second;
     releaseBrowser();
-    expect(inFlight.closed).toBe(false);
 
-    // Once idle, the next render retires it.
-    await render();
+    // The quota was crossed, so the waiting render got a fresh process — and
+    // the old one was only closed once nothing was using it.
     expect(inFlight.closed).toBe(true);
+    expect(secondBrowser).not.toBe(inFlight);
+  });
+
+  it("runs renders one at a time", async () => {
+    const order: string[] = [];
+    const first = await acquireBrowser();
+    order.push("first-acquired");
+
+    const second = acquireBrowser().then(() => order.push("second-acquired"));
+    await Promise.resolve();
+    // Two 1080x1920 pages at once is what OOM-kills the 512 MiB instance.
+    expect(order).toEqual(["first-acquired"]);
+
+    order.push("first-released");
+    releaseBrowser();
+    await second;
+    releaseBrowser();
+
+    expect(order).toEqual(["first-acquired", "first-released", "second-acquired"]);
+    expect(first).toBeTruthy();
+  });
+
+  it("frees the slot when a render never starts", async () => {
+    // A failed acquire that kept the slot would wedge every later render.
+    await render();
+    const before = __browserPoolStateForTests();
+    expect(before.activeRenders).toBe(0);
+    await expect(render()).resolves.toBeTruthy();
   });
 
   it("does not let health checks count towards the quota", async () => {

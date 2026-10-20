@@ -62,6 +62,29 @@ let rendersServed = 0;
 let activeRenders = 0;
 const RENDERS_PER_BROWSER = 25;
 
+/** Renders run one at a time. Two 1080x1920 pages open together are enough to
+ *  push Chrome plus Node past the 512 MiB this instance has, and the container
+ *  is then OOM-killed — which fails every other request in flight, not just
+ *  the second export, and drops the service for the ~20s it takes to come
+ *  back. Confirmed on the live service: three concurrent exports returned 502
+ *  and Render logged `oomKilled`, while the same three run in sequence all
+ *  succeed. Queuing costs the second caller some waiting and costs everyone
+ *  else nothing. */
+let slotTaken = false;
+const waiting: (() => void)[] = [];
+
+async function takeRenderSlot(): Promise<void> {
+  while (slotTaken) await new Promise<void>((resolve) => waiting.push(resolve));
+  // Claimed synchronously the moment the wait resolves, before any further
+  // await can let another caller through.
+  slotTaken = true;
+}
+
+function freeRenderSlot(): void {
+  slotTaken = false;
+  waiting.shift()?.();
+}
+
 function launch(): Promise<Browser> {
   const promise = chromium
     .launch({
@@ -109,15 +132,24 @@ async function recycleIfDue(): Promise<void> {
  *  `releaseBrowser` in a `finally`, or the count of in-flight renders never
  *  returns to zero and the browser is never recycled. */
 export async function acquireBrowser(): Promise<Browser> {
-  await recycleIfDue();
-  const browser = await getBrowser();
-  rendersServed++;
-  activeRenders++;
-  return browser;
+  await takeRenderSlot();
+  try {
+    await recycleIfDue();
+    const browser = await getBrowser();
+    rendersServed++;
+    activeRenders++;
+    return browser;
+  } catch (err) {
+    // The slot has to go back even when the browser never started, or every
+    // later render queues behind a render that is not happening.
+    freeRenderSlot();
+    throw err;
+  }
 }
 
 export function releaseBrowser(): void {
   activeRenders = Math.max(0, activeRenders - 1);
+  freeRenderSlot();
 }
 
 /** Test seams. The pool is module state, so a test that does not reset it
@@ -131,6 +163,8 @@ export async function __resetBrowserPoolForTests(): Promise<void> {
   browserPromise = null;
   rendersServed = 0;
   activeRenders = 0;
+  slotTaken = false;
+  waiting.length = 0;
   const browser = await current?.catch(() => null);
   if (browser) await browser.close().catch(() => undefined);
 }
