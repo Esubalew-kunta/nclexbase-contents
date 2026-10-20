@@ -9,6 +9,7 @@ import { downloadBlob } from "@/lib/download";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EditQuestionModal } from "./EditQuestionModal";
 import type { BankQuestion, BankFilter } from "./types";
+import { utcToZonedDateStr, utcToZonedTimeStr } from "@/lib/telegram/timezone";
 
 /** Short enough for a confirmation dialog without the question's full text
  * burying the "are you sure" under three paragraphs. */
@@ -24,6 +25,51 @@ const FILTERS: { value: Filter; label: string }[] = [
   { value: "multiple", label: BANK_FORMAT_LABELS.multiple },
   { value: "bowtie", label: BANK_FORMAT_LABELS.bowtie },
 ];
+
+/** Questions are boxed by the day their image was generated, so a day's output
+ *  reads as one batch. A question that has never been rendered has no such day,
+ *  so it goes in its own box at the top rather than being filed under a date
+ *  that would be a guess. */
+const NOT_GENERATED = "not-generated";
+
+interface DayGroup {
+  key: string;
+  label: string;
+  questions: BankQuestion[];
+}
+
+/** "20 Oct 2026", or "Today"/"Yesterday" for the two days that have a name the
+ *  admin reads faster than a date. */
+function dayLabel(dateStr: string, todayStr: string, timeZone: string): string {
+  if (dateStr === todayStr) return "Today";
+  if (dateStr === utcToZonedDateStr(new Date(Date.now() - 86400000), timeZone)) return "Yesterday";
+  const [year, month, day] = dateStr.split("-").map(Number);
+  // Formatted from a UTC-anchored date so the label can never slide a day in
+  // the browser's own timezone, which is not the one we grouped by.
+  return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+}
+
+/** Groups by generation day, newest day first, with the un-rendered questions
+ *  pinned to the top — they are the ones that still need an action. Order
+ *  within a day is left exactly as the server sent it. */
+function groupByGeneratedDay(questions: BankQuestion[], timeZone: string, todayStr: string): DayGroup[] {
+  const byDay = new Map<string, BankQuestion[]>();
+  for (const q of questions) {
+    const key = q.slide_rendered_at ? utcToZonedDateStr(new Date(q.slide_rendered_at), timeZone) : NOT_GENERATED;
+    const bucket = byDay.get(key);
+    if (bucket) bucket.push(q);
+    else byDay.set(key, [q]);
+  }
+
+  const dated = [...byDay.keys()]
+    .filter((key) => key !== NOT_GENERATED)
+    .sort()
+    .reverse()
+    .map((key) => ({ key, label: dayLabel(key, todayStr, timeZone), questions: byDay.get(key)! }));
+
+  const pending = byDay.get(NOT_GENERATED);
+  return pending ? [{ key: NOT_GENERATED, label: "Not generated yet", questions: pending }, ...dated] : dated;
+}
 
 const STATUS_PILL: Record<string, { label: string; className: string }> = {
   none: { label: "No image yet", className: "bg-gray-100 text-gray-600" },
@@ -107,6 +153,25 @@ export function QuestionBankPage() {
   }, []);
 
   const needsSlides = useMemo(() => (questions ?? []).filter((q) => q.slide_status !== "ready"), [questions]);
+
+  // The configured timezone decides which calendar day a render falls on, the
+  // same way the calendar and dashboard resolve it — never the browser's.
+  const [timeZone, setTimeZone] = useState("UTC");
+  useEffect(() => {
+    fetch("/api/telegram/settings")
+      .then((r) => r.json())
+      .then((data) => {
+        if (typeof data?.settings?.timezone === "string") setTimeZone(data.settings.timezone);
+      })
+      // Display-only: a settings read that fails leaves the boxes on UTC rather
+      // than taking the whole bank down with it.
+      .catch(() => {});
+  }, []);
+
+  const dayGroups = useMemo(
+    () => groupByGeneratedDay(questions ?? [], timeZone, utcToZonedDateStr(new Date(), timeZone)),
+    [questions, timeZone],
+  );
 
   async function generate(id: string, templateId?: string) {
     setBusyId(id);
@@ -300,8 +365,15 @@ export function QuestionBankPage() {
           )}
         </div>
       ) : (
-        <ul className="flex flex-col gap-4">
-          {questions.map((q) => {
+        <div className="flex flex-col gap-6">
+          {dayGroups.map((group) => (
+            <section key={group.key} className="rounded-2xl border border-gray-200 bg-gray-50/60 p-3 sm:p-4">
+              <div className="mb-3 flex flex-wrap items-baseline gap-2">
+                <h2 className="text-sm font-bold text-brand-dark">{group.label}</h2>
+                <span className="text-xs text-gray-500">{group.questions.length} question{group.questions.length === 1 ? "" : "s"}</span>
+              </div>
+              <ul className="flex flex-col gap-4">
+          {group.questions.map((q) => {
             const pill = STATUS_PILL[q.slide_status] ?? STATUS_PILL.none;
             const busy = busyId === q.id;
             return (
@@ -321,6 +393,9 @@ export function QuestionBankPage() {
                       </span>
                       <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${pill.className}`}>{pill.label}</span>
                       {q.external_id && <span className="text-xs text-gray-400">id: {q.external_id}</span>}
+                      {q.slide_rendered_at && (
+                        <span className="text-xs text-gray-400">generated {utcToZonedTimeStr(new Date(q.slide_rendered_at), timeZone)}</span>
+                      )}
                     </div>
                     <p className="line-clamp-3 text-sm leading-relaxed text-gray-800">{q.question}</p>
                     {q.slide_error && <p className="mt-2 text-xs text-red-600">{q.slide_error}</p>}
@@ -382,7 +457,10 @@ export function QuestionBankPage() {
               </li>
             );
           })}
-        </ul>
+              </ul>
+            </section>
+          ))}
+        </div>
       )}
 
       {editing && (
