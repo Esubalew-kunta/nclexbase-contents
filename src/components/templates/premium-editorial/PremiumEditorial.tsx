@@ -4,6 +4,7 @@ import type { SlideFrameProps, TemplateModule } from "@/lib/slides/registry";
 import type { TemplateMeta } from "@/lib/slides/types";
 import { QUESTION_LABEL, CTA_TITLE } from "@/lib/slides/chrome-copy";
 import { QuestionImageBlock } from "@/components/slides/QuestionImageBlock";
+import { ExplanationText } from "@/components/slides/ExplanationText";
 import { BowtieDiagram } from "@/components/slides/BowtieDiagram";
 import { bowtieTheme } from "@/components/slides/bowtieThemes";
 import { PaperPlaneIcon } from "@/components/slides/PaperPlaneIcon";
@@ -92,7 +93,7 @@ export function AnswerBlockView({ block }: { block: AnswerBlock }) {
       return (
         <div className={styles.sectionTop}>
           <h3 className={styles.sectionHead}>Why</h3>
-          <p className={styles.p}>{block.text}</p>
+          <ExplanationText className={styles.p} text={block.text} />
         </div>
       );
     case "wrong":
