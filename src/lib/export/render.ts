@@ -1,4 +1,4 @@
-import { getBrowser } from "./browser";
+import { acquireBrowser, releaseBrowser } from "./browser";
 import { putPrintPayload, deletePrintPayload, type PrintPayload } from "./tokenStore";
 import type { Page } from "playwright";
 import { putPrintImage, deletePrintImage } from "./imageStore";
@@ -69,8 +69,16 @@ async function withPrintPage<T>(payload: PrintPayload, requestOrigin: string, ca
     attempt++;
     const token = putPrintPayload(payload);
     try {
-      const browser = await getBrowser();
-      const page = await browser.newPage({ viewport: { width: 1200, height: 1200 } });
+      const browser = await acquireBrowser();
+      // Held for the whole page lifetime, not just the navigation: the browser
+      // must not be recycled while this page is still being screenshotted.
+      let page;
+      try {
+        page = await browser.newPage({ viewport: { width: 1200, height: 1200 } });
+      } catch (err) {
+        releaseBrowser();
+        throw err;
+      }
       try {
         await page.goto(`${origin}/print?token=${token}`, { waitUntil: "domcontentloaded" });
         await page.waitForFunction(() => window.__READY__ === true, { timeout: 15000 });
@@ -111,7 +119,8 @@ async function withPrintPage<T>(payload: PrintPayload, requestOrigin: string, ca
 
         return await capture(page);
       } finally {
-        await page.close();
+        await page.close().catch(() => undefined);
+        releaseBrowser();
       }
     } catch (err) {
       // A genuine layout failure, not a dead browser: retrying cannot help.

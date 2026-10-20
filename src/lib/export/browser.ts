@@ -46,13 +46,20 @@ const LAUNCH_ARGS = [
   "--media-cache-size=1",
 ];
 
-/** Renders served by the current browser process. Chrome's own memory creeps up
- *  across renders — caches, the network stack, per-navigation allocations — and
- *  on a 512 MiB instance that creep is what eventually trips the OOM killer
- *  rather than any single large page. Recycling the process on a fixed count
- *  returns all of it at the cost of one relaunch (about a second) every so
- *  often, which is far cheaper than the crash it prevents. */
+/** Renders served by the current browser process, and how many are in flight
+ *  right now. Chrome's own memory creeps up across renders — caches, the
+ *  network stack, per-navigation allocations — and on a 512 MiB instance that
+ *  creep is what eventually trips the OOM killer rather than any single large
+ *  page. Recycling the process on a fixed count returns all of it for the cost
+ *  of one relaunch, which is far cheaper than the crash it prevents.
+ *
+ *  Both counters are maintained by `acquireBrowser`/`releaseBrowser` and not by
+ *  `getBrowser`, because the health check calls `getBrowser` too. Counting its
+ *  probes drove the count to the limit within minutes of a deploy on its own,
+ *  and recycling then closed a browser that an export was still rendering in —
+ *  which surfaced as `page.goto: net::ERR_ABORTED`. */
 let rendersServed = 0;
+let activeRenders = 0;
 const RENDERS_PER_BROWSER = 25;
 
 function launch(): Promise<Browser> {
@@ -78,20 +85,54 @@ function launch(): Promise<Browser> {
 export async function getBrowser(): Promise<Browser> {
   if (browserPromise) {
     const existing = await browserPromise.catch(() => null);
-    if (existing && existing.isConnected()) {
-      if (rendersServed < RENDERS_PER_BROWSER) {
-        rendersServed++;
-        return existing;
-      }
-      // Closed without awaiting: the caller only needs the replacement, and a
-      // slow shutdown of the old process must not be charged to this export.
-      void existing.close().catch(() => undefined);
-    }
+    if (existing && existing.isConnected()) return existing;
     browserPromise = null;
   }
-  rendersServed = 1;
   browserPromise = launch();
   return browserPromise;
+}
+
+/** Retires the browser once it has served its quota, but only while nothing is
+ *  rendering in it. Closing a browser out from under an open page aborts that
+ *  page's navigation, so a busy process simply serves past the quota and is
+ *  retired by whichever render next finds it idle. */
+async function recycleIfDue(): Promise<void> {
+  if (rendersServed < RENDERS_PER_BROWSER || activeRenders > 0 || !browserPromise) return;
+  const retiring = browserPromise;
+  browserPromise = null;
+  rendersServed = 0;
+  const browser = await retiring.catch(() => null);
+  if (browser) await browser.close().catch(() => undefined);
+}
+
+/** Takes a browser for one page's work. Every caller must pair this with
+ *  `releaseBrowser` in a `finally`, or the count of in-flight renders never
+ *  returns to zero and the browser is never recycled. */
+export async function acquireBrowser(): Promise<Browser> {
+  await recycleIfDue();
+  const browser = await getBrowser();
+  rendersServed++;
+  activeRenders++;
+  return browser;
+}
+
+export function releaseBrowser(): void {
+  activeRenders = Math.max(0, activeRenders - 1);
+}
+
+/** Test seams. The pool is module state, so a test that does not reset it
+ *  inherits the previous test's quota. */
+export function __browserPoolStateForTests() {
+  return { rendersServed, activeRenders, hasBrowser: browserPromise !== null };
+}
+
+export async function __resetBrowserPoolForTests(): Promise<void> {
+  const current = browserPromise;
+  browserPromise = null;
+  rendersServed = 0;
+  activeRenders = 0;
+  const browser = await current?.catch(() => null);
+  if (browser) await browser.close().catch(() => undefined);
 }
 
 /** Probes whether Chrome can actually launch, for the health check. Verifies
